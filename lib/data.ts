@@ -66,14 +66,26 @@ export async function archiveReport(id: string, archived: boolean): Promise<bool
   return true;
 }
 
-export async function deleteReport(id: string): Promise<boolean> {
-  const supabase = createClient();
-  const { error } = await supabase.from("tech_reports").delete().eq("id", id);
-  if (error) {
-    console.error("[deleteReport] error:", error.message);
-    return false;
+export async function deleteReport(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log("[deleteReport] attempting to delete id:", id);
+    const supabase = createClient();
+    const { error, count } = await supabase.from("tech_reports").delete().eq("id", id);
+    console.log("[deleteReport] result — error:", error, "count:", count);
+    if (error) {
+      console.error("[deleteReport] Supabase error:", error.message, error.details, error.hint);
+      return { success: false, error: error.message };
+    }
+    if (count === 0) {
+      console.warn("[deleteReport] no rows deleted for id:", id);
+      return { success: false, error: `Отчёт с id ${id} не найден` };
+    }
+    console.log("[deleteReport] success, deleted:", count);
+    return { success: true };
+  } catch (err: any) {
+    console.error("[deleteReport] exception:", err);
+    return { success: false, error: err?.message || String(err) };
   }
-  return true;
 }
 
 export function generateId(): string {
