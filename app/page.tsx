@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import AdminPanel from '@/components/AdminPanel';
 import ArchiveModal from '@/components/ArchiveModal';
 import { loadReports, saveReport, archiveReport, generateId } from '@/lib/data';
-import { listUsers } from '@/lib/auth';
 import type { TechReport, ReportFilters, DateRange } from '@/lib/types';
 import {
   STATUS_COLORS, SERVICE_TYPES, RP_STATUS_OPTIONS,
   LETTERS_STATUS_OPTIONS, REPORT_STATUS_OPTIONS, DIRECTION_OPTIONS,
+  EXECUTORS,
 } from '@/lib/types';
 import { logout, getCurrentUser, isAdmin } from '@/lib/auth';
 
@@ -21,7 +21,8 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [allUsers, setAllUsers] = useState<Array<{ username: string; isAdmin: boolean }>>([]);
+  const [headerHeight, setHeaderHeight] = useState(108);
+  const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     loadReports().then((data) => {
@@ -37,15 +38,28 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    listUsers().then(users => setAllUsers(users));
-  }, []);
-
-  useEffect(() => {
     const checkHash = () => { setShowAdmin(window.location.hash === '#/admin'); };
     checkHash();
     window.addEventListener('hashchange', checkHash);
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
+
+  // Измеряем высоту header для sticky th
+  useEffect(() => {
+    const measure = () => {
+      if (headerRef.current) {
+        setHeaderHeight(headerRef.current.offsetHeight);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    // Повторное измерение после загрузки данных
+    const timer = setTimeout(measure, 100);
+    return () => {
+      window.removeEventListener('resize', measure);
+      clearTimeout(timer);
+    };
+  }, [loaded]);
 
   const uniqueObjects = useMemo(() => Array.from(new Set(reports.map(r => r.object))).filter(Boolean).sort(), [reports]);
   const uniqueStatuses = useMemo(() => Array.from(new Set(reports.map(r => r.report_status))).filter(Boolean).sort(), [reports]);
@@ -102,30 +116,36 @@ export default function Home() {
   }, []);
 
   const handleSave = useCallback(async (report: TechReport) => {
-    const workDatesStr = (report.date_ranges || [])
-      .filter(d => d.from || d.to)
-      .map(d => {
-        const from = d.from ? new Date(d.from).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
-        const to = d.to ? new Date(d.to).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
-        return from && to ? `${from}-${to}` : from || to;
-      })
-      .join(', ');
-    const finalReport = { ...report, work_dates: workDatesStr || report.work_dates };
-    const success = await saveReport(finalReport);
-    if (success) {
-      setReports(prev => {
-        const idx = prev.findIndex(r => r.id === report.id);
-        if (idx >= 0) {
-          const updated = [...prev];
-          updated[idx] = finalReport;
-          return updated;
-        }
-        return [finalReport, ...prev];
-      });
-      setShowModal(false);
-      setEditing(null);
-    } else {
-      alert('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f');
+    try {
+      const workDatesStr = (report.date_ranges || [])
+        .filter(d => d.from || d.to)
+        .map(d => {
+          const from = d.from ? new Date(d.from).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
+          const to = d.to ? new Date(d.to).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
+          return from && to ? `${from}-${to}` : from || to;
+        })
+        .join(', ');
+      const finalReport = { ...report, work_dates: workDatesStr || report.work_dates };
+      const success = await saveReport(finalReport);
+      if (success) {
+        setReports(prev => {
+          const idx = prev.findIndex(r => r.id === report.id);
+          if (idx >= 0) {
+            const updated = [...prev];
+            updated[idx] = finalReport;
+            return updated;
+          }
+          return [finalReport, ...prev];
+        });
+        setShowModal(false);
+        setEditing(null);
+      } else {
+        alert('Ошибка сохранения. Проверьте подключение к интернету и попробуйте снова.');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert('Критическая ошибка при сохранении:\n' + message);
+      console.error('[handleSave] error:', err);
     }
   }, []);
 
@@ -146,7 +166,7 @@ export default function Home() {
   const handleLogout = useCallback(() => { logout(); window.location.reload(); }, []);
 
   const StatusBadge = ({ status }: { status: string }) => {
-    if (!status) return <span style={{ color: '#94a3b8', fontSize: 11 }}>\u2014</span>;
+    if (!status) return <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>;
     const color = STATUS_COLORS[status] || '#94a3b8';
     return (
       <span className="status-badge" style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}>
@@ -161,52 +181,52 @@ export default function Home() {
       {showAdmin ? (
         <AdminPanel onBack={() => { window.location.hash = ''; setShowAdmin(false); }} />
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f0eeeb' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         {/* STICKY HEADER */}
-        <header style={{
+        <header ref={headerRef} style={{
           position: 'sticky',
           top: 0,
           zIndex: 30,
-          background: 'rgba(255,255,255,0.92)',
+          background: 'rgba(255,255,255,0.95)',
           backdropFilter: 'blur(16px)',
           borderBottom: '1px solid rgba(0,0,0,0.06)',
           boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <h1 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>{'\ud83d\udccb'} \u0422\u0435\u0445. \u043e\u0442\u0447\u0451\u0442\u044b</h1>
+              <h1 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>📋 Тех. отчёты</h1>
               <span style={{ fontSize: 12, color: '#5a5a72' }}>
-                {filtered.length} \u0438\u0437 {reports.length}
-                {archivedCount > 0 && <span style={{ color: '#f59e0b' }}> | {'\ud83d\udce6'} {archivedCount}</span>}
+                {filtered.length} из {reports.length}
+                {archivedCount > 0 && <span style={{ color: '#f59e0b' }}> | 📦 {archivedCount}</span>}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: '#5a5a72' }}>{'\ud83d\udc64'} {getCurrentUser()} {isAdmin() ? '(\u0430\u0434\u043c\u0438\u043d)' : ''}</span>
+              <span style={{ fontSize: 12, color: '#5a5a72' }}>👤 {getCurrentUser()} {isAdmin() ? '(админ)' : ''}</span>
               {isAdmin() && (
                 <button
                   onClick={() => { window.location.hash = '#/admin'; }}
                   style={{ padding: '6px 12px', background: 'transparent', color: '#6b7280', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
                 >
-                  {'\u2699\ufe0f'} \u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435
+                  ⚙️ Управление
                 </button>
               )}
               <button
                 onClick={() => setShowArchive(true)}
                 style={{ padding: '6px 12px', background: '#fff7ed', color: '#d97706', border: '1px solid #fed7aa', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
               >
-                {'\ud83d\udce6'} \u0410\u0440\u0445\u0438\u0432
+                📦 Архив
               </button>
               <button
                 onClick={handleAdd}
                 style={{ padding: '6px 12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
               >
-                + \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c
+                + Добавить
               </button>
               <button
                 onClick={handleLogout}
                 style={{ padding: '6px 12px', background: 'transparent', color: '#5a5a72', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
               >
-                \u0412\u044b\u0439\u0442\u0438
+                Выйти
               </button>
             </div>
           </div>
@@ -214,25 +234,25 @@ export default function Home() {
           <div style={{ display: 'flex', gap: 8, padding: '8px 20px', background: 'rgba(255,255,255,0.5)', borderBottom: '1px solid rgba(0,0,0,0.04)', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
-              placeholder={'\ud83d\udd0d'}
+              placeholder="🔍"
               value={filters.search}
               onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
               style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, minWidth: 150 }}
             />
             <select value={filters.object} onChange={(e) => setFilters(f => ({ ...f, object: e.target.value }))} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12 }}>
-              <option value="">\u0412\u0441\u0435 \u043e\u0431\u044a\u0435\u043a\u0442\u044b</option>
+              <option value="">Все объекты</option>
               {uniqueObjects.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             <select value={filters.service_type} onChange={(e) => setFilters(f => ({ ...f, service_type: e.target.value }))} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12 }}>
-              <option value="">\u0412\u0441\u0435 \u0432\u0438\u0434\u044b \u0443\u0441\u043b\u0443\u0433</option>
+              <option value="">Все виды услуг</option>
               {SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <select value={filters.report_status} onChange={(e) => setFilters(f => ({ ...f, report_status: e.target.value }))} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12 }}>
-              <option value="">\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b</option>
+              <option value="">Все статусы</option>
               {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <select value={filters.executor} onChange={(e) => setFilters(f => ({ ...f, executor: e.target.value }))} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12 }}>
-              <option value="">\u0412\u0441\u0435 \u0438\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u0438</option>
+              <option value="">Все исполнители</option>
               {uniqueExecutors.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
             {(filters.object || filters.service_type || filters.report_status || filters.executor || filters.search) && (
@@ -240,19 +260,19 @@ export default function Home() {
                 onClick={() => setFilters({ object: '', service_type: '', report_status: '', executor: '', search: '', show_archived: filters.show_archived })}
                 style={{ padding: '6px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
               >
-                \u2715 \u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c
+                ✕ Сбросить
               </button>
             )}
           </div>
         </header>
 
         {/* TABLE */}
-        <div style={{ flex: 1, padding: '12px 20px', overflow: 'auto' }}>
+        <div style={{ padding: '12px 20px' }}>
           {!loaded ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>{'\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...'}</div>
+            <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>Загрузка...</div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>
-              {reports.length === 0 ? '\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445. \u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u043e\u0442\u0447\u0451\u0442.' : '\u041d\u0435\u0442 \u0437\u0430\u043f\u0438\u0441\u0435\u0439 \u043f\u043e \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u043c \u0444\u0438\u043b\u044c\u0442\u0440\u0430\u043c.'}
+              {reports.length === 0 ? 'Нет данных. Добавьте первый отчёт.' : 'Нет записей по выбранным фильтрам.'}
             </div>
           ) : (
             <table className="report-table">
@@ -271,17 +291,17 @@ export default function Home() {
               </colgroup>
               <thead>
                 <tr>
-                  <th>{'\u041e\u0431\u044a\u0435\u043a\u0442'}</th>
-                  <th>{'\u0412\u0438\u0434 \u0443\u0441\u043b\u0443\u0433'}</th>
-                  <th>{'\u041e\u0431\u043e\u0440\u0443\u0434\u043e\u0432\u0430\u043d\u0438\u0435'}</th>
-                  <th>{'\u0420\u041f/\u041f\u041f\u0420'}</th>
-                  <th>{'\u041f\u0438\u0441\u044c\u043c\u0430'}</th>
-                  <th>{'\u0414\u0430\u0442\u044b \u0440\u0430\u0431\u043e\u0442'}</th>
-                  <th>{'\u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u0438'}</th>
-                  <th>{'\u2116 \u043e\u0442\u0447\u0451\u0442\u0430'}</th>
-                  <th>{'\u0421\u0442\u0430\u0442\u0443\u0441'}</th>
-                  <th>{'\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e'}</th>
-                  <th>{'\u041f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u0435'}</th>
+                  <th style={{ top: headerHeight }}>Объект</th>
+                  <th style={{ top: headerHeight }}>Вид услуг</th>
+                  <th style={{ top: headerHeight }}>Оборудование</th>
+                  <th style={{ top: headerHeight }}>РП/ППР</th>
+                  <th style={{ top: headerHeight }}>Письма</th>
+                  <th style={{ top: headerHeight }}>Даты работ</th>
+                  <th style={{ top: headerHeight }}>Исполнители</th>
+                  <th style={{ top: headerHeight }}>№ отчёта</th>
+                  <th style={{ top: headerHeight }}>Статус</th>
+                  <th style={{ top: headerHeight }}>Отправлено</th>
+                  <th style={{ top: headerHeight }}>Примечание</th>
                 </tr>
               </thead>
               <tbody>
@@ -313,7 +333,6 @@ export default function Home() {
         {showModal && editing && (
           <EditModal
             report={editing}
-            allUsers={allUsers}
             isNew={!reports.find(r => r.id === editing.id)}
             onSave={handleSave}
             onClose={() => { setShowModal(false); setEditing(null); }}
@@ -336,9 +355,8 @@ export default function Home() {
 
 // ===== EDIT MODAL =====
 
-function EditModal({ report, allUsers, isNew, onSave, onClose }: {
+function EditModal({ report, isNew, onSave, onClose }: {
   report: TechReport;
-  allUsers: Array<{ username: string; isAdmin: boolean }>;
   isNew: boolean;
   onSave: (r: TechReport) => void;
   onClose: () => void;
@@ -349,6 +367,7 @@ function EditModal({ report, allUsers, isNew, onSave, onClose }: {
     executor_ids: report.executor_ids?.length ? [...report.executor_ids] : [],
   });
   const [showExecutors, setShowExecutors] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, outline: 'none',
@@ -356,12 +375,12 @@ function EditModal({ report, allUsers, isNew, onSave, onClose }: {
   const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer' };
   const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: '#5a5a72', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.03em' };
 
-  const toggleExecutor = (username: string) => {
+  const toggleExecutor = (initials: string) => {
     setForm(prev => {
       const ids = prev.executor_ids || [];
-      const has = ids.includes(username);
-      const newIds = has ? ids.filter(id => id !== username) : [...ids, username];
-      const names = allUsers.filter(u => newIds.includes(u.username)).map(u => u.username).join(', ');
+      const has = ids.includes(initials);
+      const newIds = has ? ids.filter(id => id !== initials) : [...ids, initials];
+      const names = newIds.join(', ');
       return { ...prev, executor_ids: newIds, executor: names };
     });
   };
@@ -381,6 +400,17 @@ function EditModal({ report, allUsers, isNew, onSave, onClose }: {
     });
   };
 
+  const handleSaveClick = async () => {
+    setSaving(true);
+    try {
+      await onSave({ ...form, updated_at: new Date().toISOString() });
+    } catch (err) {
+      console.error('[EditModal] save error:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div
       onClick={onClose}
@@ -392,83 +422,83 @@ function EditModal({ report, allUsers, isNew, onSave, onClose }: {
         style={{ background: 'white', borderRadius: 16, padding: 28, width: '100%', maxWidth: 640, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
       >
         <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: '#1a1a2e' }}>
-          {isNew ? '\u2795 \u041d\u043e\u0432\u044b\u0439 \u043e\u0442\u0447\u0451\u0442' : '\u270f\ufe0f \u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043e\u0442\u0447\u0451\u0442'}
+          {isNew ? '➕ Новый отчёт' : '✏️ Редактировать отчёт'}
         </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* 1. \u041e\u0431\u044a\u0435\u043a\u0442 */}
+          {/* 1. Объект */}
           <div>
-            <label style={labelStyle}>{'\u041e\u0431\u044a\u0435\u043a\u0442'}</label>
+            <label style={labelStyle}>Объект</label>
             <input type="text" value={form.object} onChange={e => setForm(prev => ({ ...prev, object: e.target.value }))} style={inputStyle} />
           </div>
 
-          {/* 2. \u0412\u0438\u0434 \u0443\u0441\u043b\u0443\u0433 */}
+          {/* 2. Вид услуг */}
           <div>
-            <label style={labelStyle}>{'\u0412\u0438\u0434 \u0443\u0441\u043b\u0443\u0433'}</label>
+            <label style={labelStyle}>Вид услуг</label>
             <select value={form.service_type} onChange={e => setForm(prev => ({ ...prev, service_type: e.target.value }))} style={selectStyle}>
-              <option value="">{'\u2014 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u2014'}</option>
+              <option value="">— выберите —</option>
               {SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {/* 3. \u041e\u0431\u043e\u0440\u0443\u0434\u043e\u0432\u0430\u043d\u0438\u0435 */}
+          {/* 3. Оборудование */}
           <div>
-            <label style={labelStyle}>{'\u041e\u0431\u043e\u0440\u0443\u0434\u043e\u0432\u0430\u043d\u0438\u0435'}</label>
+            <label style={labelStyle}>Оборудование</label>
             <input type="text" value={form.equipment} onChange={e => setForm(prev => ({ ...prev, equipment: e.target.value }))} style={inputStyle} />
           </div>
 
-          {/* 4. \u0420\u041f/\u041f\u041f\u0420 */}
+          {/* 4. РП/ППР */}
           <div>
-            <label style={labelStyle}>{'\u0420\u041f/\u041f\u041f\u0420'}</label>
+            <label style={labelStyle}>РП/ППР</label>
             <select value={form.rp_status} onChange={e => setForm(prev => ({ ...prev, rp_status: e.target.value }))} style={selectStyle}>
-              <option value="">{'\u2014 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u2014'}</option>
+              <option value="">— выберите —</option>
               {RP_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {/* 5. \u041f\u0438\u0441\u044c\u043c\u0430 */}
+          {/* 5. Письма */}
           <div>
-            <label style={labelStyle}>{'\u041f\u0438\u0441\u044c\u043c\u0430'}</label>
+            <label style={labelStyle}>Письма</label>
             <select value={form.letters_status} onChange={e => setForm(prev => ({ ...prev, letters_status: e.target.value }))} style={selectStyle}>
-              <option value="">{'\u2014 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u2014'}</option>
+              <option value="">— выберите —</option>
               {LETTERS_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {/* 8. \u2116 \u043e\u0442\u0447\u0451\u0442\u0430 */}
+          {/* 8. № отчёта */}
           <div>
-            <label style={labelStyle}>{'\u2116 \u043e\u0442\u0447\u0451\u0442\u0430'}</label>
+            <label style={labelStyle}>№ отчёта</label>
             <input type="text" value={form.report_number} onChange={e => setForm(prev => ({ ...prev, report_number: e.target.value }))} style={inputStyle} />
           </div>
 
-          {/* 9. \u0421\u0442\u0430\u0442\u0443\u0441 \u043e\u0442\u0447\u0451\u0442\u0430 */}
+          {/* 9. Статус отчёта */}
           <div>
-            <label style={labelStyle}>{'\u0421\u0442\u0430\u0442\u0443\u0441 \u043e\u0442\u0447\u0451\u0442\u0430'}</label>
+            <label style={labelStyle}>Статус отчёта</label>
             <select value={form.report_status} onChange={e => setForm(prev => ({ ...prev, report_status: e.target.value }))} style={selectStyle}>
-              <option value="">{'\u2014 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u2014'}</option>
+              <option value="">— выберите —</option>
               {REPORT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {/* 10. \u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e */}
+          {/* 10. Отправлено */}
           <div>
-            <label style={labelStyle}>{'\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e'}</label>
+            <label style={labelStyle}>Отправлено</label>
             <select value={form.direction} onChange={e => setForm(prev => ({ ...prev, direction: e.target.value }))} style={selectStyle}>
-              <option value="">{'\u2014 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u2014'}</option>
+              <option value="">— выберите —</option>
               {DIRECTION_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {/* 6. \u0414\u0430\u0442\u044b \u0440\u0430\u0431\u043e\u0442 */}
+          {/* 6. Даты работ */}
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>{'\u0414\u0430\u0442\u044b \u0440\u0430\u0431\u043e\u0442 (\u0434\u043e 6 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432)'}</label>
+            <label style={labelStyle}>Даты работ (до 6 периодов)</label>
             {(form.date_ranges || []).map((range, idx) => (
               <div key={idx} className="date-range-row">
                 <span style={{ fontSize: 12, color: '#9ca3af' }}>{idx + 1}.</span>
                 <input type="date" value={range.from} onChange={e => updateDateRange(idx, 'from', e.target.value)} />
-                <span style={{ fontSize: 12, color: '#9ca3af' }}>{'\u043f\u043e'}</span>
+                <span style={{ fontSize: 12, color: '#9ca3af' }}>по</span>
                 <input type="date" value={range.to} onChange={e => updateDateRange(idx, 'to', e.target.value)} />
-                <button type="button" onClick={() => removeDateRange(idx)}>{'\u2715'}</button>
+                <button type="button" onClick={() => removeDateRange(idx)}>✕</button>
               </div>
             ))}
             {(form.date_ranges || []).length < 6 && (
@@ -477,14 +507,14 @@ function EditModal({ report, allUsers, isNew, onSave, onClose }: {
                 onClick={addDateRange}
                 style={{ marginTop: 4, padding: '4px 12px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
               >
-                + {'\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u0435\u0440\u0438\u043e\u0434'}
+                + Добавить период
               </button>
             )}
           </div>
 
-          {/* 7. \u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u0438 */}
+          {/* 7. Исполнители */}
           <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
-            <label style={labelStyle}>{'\u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u0438 (\u043c\u0443\u043b\u044c\u0442\u0438-\u0432\u044b\u0431\u043e\u0440)'}</label>
+            <label style={labelStyle}>Исполнители (мульти-выбор)</label>
             <div className="executor-multi-select">
               <div
                 onClick={() => setShowExecutors(!showExecutors)}
@@ -505,43 +535,38 @@ function EditModal({ report, allUsers, isNew, onSave, onClose }: {
                       <span
                         onClick={(e) => { e.stopPropagation(); toggleExecutor(id); }}
                         style={{ cursor: 'pointer', marginLeft: 2, color: '#ef4444' }}
-                      >{'\u00d7'}</span>
+                      >×</span>
                     </span>
                   ))
                 ) : (
-                  <span style={{ color: '#9ca3af' }}>{'\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u0435\u0439...'}</span>
+                  <span style={{ color: '#9ca3af' }}>Выберите исполнителей...</span>
                 )}
               </div>
               {showExecutors && (
                 <div className="executor-dropdown">
-                  {allUsers.length === 0 ? (
-                    <div style={{ padding: '12px', color: '#9ca3af', fontSize: 12, textAlign: 'center' }}>{'\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439...'}</div>
-                  ) : (
-                    allUsers.map(u => (
-                      <div
-                        key={u.username}
-                        className="executor-option"
-                        onClick={() => toggleExecutor(u.username)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={(form.executor_ids || []).includes(u.username)}
-                          readOnly
-                          style={{ accentColor: '#2563eb' }}
-                        />
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{u.username}</span>
-                        {u.isAdmin && <span style={{ fontSize: 10, color: '#2563eb' }}>{'\u0430\u0434\u043c\u0438\u043d'}</span>}
-                      </div>
-                    ))
-                  )}
+                  {EXECUTORS.map(initials => (
+                    <div
+                      key={initials}
+                      className="executor-option"
+                      onClick={() => toggleExecutor(initials)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(form.executor_ids || []).includes(initials)}
+                        readOnly
+                        style={{ accentColor: '#2563eb' }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>{initials}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* 11. \u041f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u0435 */}
+          {/* 11. Примечание */}
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>{'\u041f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u0435'}</label>
+            <label style={labelStyle}>Примечание</label>
             <textarea
               value={form.notes}
               onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
@@ -553,13 +578,24 @@ function EditModal({ report, allUsers, isNew, onSave, onClose }: {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
           <button onClick={onClose} style={{ padding: '10px 24px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
-            {'\u041e\u0442\u043c\u0435\u043d\u0430'}
+            Отмена
           </button>
           <button
-            onClick={() => onSave({ ...form, updated_at: new Date().toISOString() })}
-            style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            onClick={handleSaveClick}
+            disabled={saving}
+            style={{
+              padding: '10px 24px',
+              background: saving ? '#93c5fd' : '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.7 : 1,
+            }}
           >
-            {'\ud83d\udcbe'} {'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c'}
+            {saving ? '💾 Сохранение...' : '💾 Сохранить'}
           </button>
         </div>
       </div>
