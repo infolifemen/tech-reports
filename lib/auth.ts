@@ -1,10 +1,8 @@
-// Cloud-based authentication using Supabase RPC
-// Shared with trip-schedule — same users database
-
 import { createSupabaseClient } from "./supabase-browser";
 
 const SESSION_KEY = "tech_reports_auth_session";
 const SESSION_EXPIRY_DAYS = 30;
+const RPC_TIMEOUT_MS = 15000;
 
 interface StoredSession {
   token: string;
@@ -41,13 +39,24 @@ function storeSession(session: StoredSession): void {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`[TIMEOUT] ${label} timeout after ${RPC_TIMEOUT_MS / 1000}s`));
+    }, RPC_TIMEOUT_MS);
+    promise
+      .then((result) => { clearTimeout(timer); resolve(result); })
+      .catch((err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
 export async function login(username: string, password: string): Promise<boolean> {
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_login", {
-      p_username: username,
-      p_password: password,
-    });
+    const { data, error } = await withTimeout(
+      supabase.rpc("app_login", { p_username: username, p_password: password }),
+      "app_login"
+    );
     if (error || !data) { console.warn("[login] RPC error:", error?.message); return false; }
     const result = data as { ok: boolean; session_token?: string; username?: string; is_admin?: boolean; error?: string };
     if (!result.ok) { console.warn("[login] Server error:", result.error); return false; }
@@ -58,7 +67,9 @@ export async function login(username: string, password: string): Promise<boolean
 
 export function logout(): void {
   const session = getStoredSession();
-  if (session) { try { const supabase = createSupabaseClient(); supabase.rpc("app_logout", { p_token: session.token }).catch(() => {}); } catch { /* ignore */ } }
+  if (session) {
+    try { const supabase = createSupabaseClient(); supabase.rpc("app_logout", { p_token: session.token }).catch(() => {}); } catch { /* ignore */ }
+  }
   if (typeof window !== "undefined") { localStorage.removeItem(SESSION_KEY); }
 }
 
@@ -71,7 +82,10 @@ export async function listUsers(): Promise<Array<{ username: string; isAdmin: bo
   if (!session) return [];
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_list_users", { p_token: session.token });
+    const { data, error } = await withTimeout(
+      supabase.rpc("app_list_users", { p_token: session.token }),
+      "app_list_users"
+    );
     if (error || !data) { console.warn("[listUsers] error:", error?.message); return []; }
     const result = data as { ok: boolean; users?: Array<{ username: string; is_admin: boolean }>; error?: string };
     if (!result.ok) return [];
@@ -84,7 +98,10 @@ export async function addUser(username: string, password: string, isAdminUser: b
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: password, p_is_admin: isAdminUser });
+    const { data, error } = await withTimeout(
+      supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: password, p_is_admin: isAdminUser }),
+      "app_upsert_user"
+    );
     if (error || !data) { console.warn("[addUser] error:", error?.message); return false; }
     return (data as { ok: boolean }).ok;
   } catch (e) { console.error("[addUser] fatal:", e); return false; }
@@ -95,7 +112,10 @@ export async function updatePassword(username: string, newPassword: string): Pro
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: newPassword, p_is_admin: isAdmin() });
+    const { data, error } = await withTimeout(
+      supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: newPassword, p_is_admin: isAdmin() }),
+      "app_upsert_user (updatePassword)"
+    );
     if (error || !data) return false;
     return (data as { ok: boolean }).ok;
   } catch (e) { console.error("[updatePassword] fatal:", e); return false; }
@@ -106,28 +126,13 @@ export async function removeUser(username: string): Promise<boolean> {
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_delete_user", { p_token: session.token, p_username: username });
+    const { data, error } = await withTimeout(
+      supabase.rpc("app_delete_user", { p_token: session.token, p_username: username }),
+      "app_delete_user"
+    );
     if (error || !data) return false;
     return (data as { ok: boolean }).ok;
   } catch (e) { console.error("[removeUser] fatal:", e); return false; }
-}
-
-export async function migrateLocalUsersToCloud(): Promise<{ migrated: number; errors: string[] }> {
-  const session = getStoredSession();
-  if (!session) return { migrated: 0, errors: ["Не авторизован"] };
-  let localUsers: User[] = [];
-  try { const raw = localStorage.getItem("tech_reports_auth_users"); if (raw) localUsers = JSON.parse(raw); } catch { return { migrated: 0, errors: ["Не удалось прочитать локальных пользователей"] }; }
-  if (localUsers.length === 0) return { migrated: 0, errors: ["Нет локальных пользователей для миграции"] };
-  const supabase = createSupabaseClient();
-  let migrated = 0; const errors: string[] = [];
-  for (const user of localUsers) {
-    try {
-      const { data, error } = await supabase.rpc("app_import_user", { p_token: session.token, p_username: user.username, p_password_hash: user.passwordHash, p_salt: user.salt, p_is_admin: user.isAdmin || false });
-      if (error || !data || !(data as { ok: boolean }).ok) { errors.push(`${user.username}: ${error?.message || (data as { error?: string })?.error || "неизвестная ошибка"}`); } else { migrated++; }
-    } catch (e) { errors.push(`${user.username}: ${e instanceof Error ? e.message : String(e)}`); }
-  }
-  if (migrated > 0) { try { localStorage.removeItem("tech_reports_auth_users"); } catch { /* ignore */ } }
-  return { migrated, errors };
 }
 
 export async function initializeDefaultUsers(): Promise<void> { return; }
