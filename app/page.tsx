@@ -17,8 +17,8 @@ export default function Home() {
 
   useEffect(() => { loadReports().then((data) => { setReports(data); setLoaded(true); }); }, []);
 
-  const uniqueObjects = useMemo(() => [...new Set(reports.map(r => r.object))].filter(Boolean).sort(), [reports]);
-  const uniqueStatuses = useMemo(() => [...new Set(reports.map(r => r.report_status))].filter(Boolean).sort(), [reports]);
+  const uniqueObjects = useMemo(() => Array.from(new Set(reports.map(r => r.object))).filter(Boolean).sort(), [reports]);
+  const uniqueStatuses = useMemo(() => Array.from(new Set(reports.map(r => r.report_status))).filter(Boolean).sort(), [reports]);
   const uniqueExecutors = useMemo(() => { const set = new Set<string>(); for (const r of reports) { for (const e of (r.executor || '').split(/[,\/\s]+/)) { if (e.trim()) set.add(e.trim()); } } return Array.from(set).sort(); }, [reports]);
 
   const filtered = useMemo(() => {
