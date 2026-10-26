@@ -1,0 +1,42 @@
+[
+  {
+    "id": "DEPLOY-007",
+    "category": "DEPLOY",
+    "severity": "BLOCKING",
+    "rule": "Деплой только на GitHub Pages",
+    "description": "Vercel запрещён для всех проектов пользователя",
+    "tags": ["deploy", "github-pages", "no-vercel"]
+  },
+  {
+    "id": "DEPLOY-008",
+    "category": "DEPLOY",
+    "severity": "BLOCKING",
+    "rule": "Деплой на GitHub Pages через GitHub Actions",
+    "description": "Использовать GitHub Actions workflow для деплоя на Pages",
+    "tags": ["deploy", "github-pages", "actions"]
+  },
+  {
+    "id": "DEPLOY-009",
+    "category": "DEPLOY",
+    "severity": "BLOCKING",
+    "rule": "GitHub Pages требует output:'export' + basePath + trailingSlash",
+    "description": "Конфигурация Next.js для статического экспорта на GitHub Pages",
+    "tags": ["deploy", "nextjs", "github-pages"]
+  },
+  {
+    "id": "DEPLOY-011",
+    "category": "DEPLOY",
+    "severity": "BLOCKING",
+    "rule": "Локальный запуск (npm run dev) НЕ нужен — только готовый результат на GitHub Pages с рабочей страницей входа",
+    "description": "Пользователь не хочет видеть локальный запуск, только деплой",
+    "tags": ["deploy", "no-local", "github-pages"]
+  },
+  {
+    "id": "WORKFLOW-001",
+    "category": "WORKFLOW",
+    "severity": "BLOCKING",
+    "rule": "Ассистент выполняет все технические шаги самостоятельно",
+    "description": "НЕ давать инструкции пользователю что делать — ассистент делает всё сам через API/CLI/код. Если шаг невозможно выполнить программно — только тогда объяснять причину.",
+    "tags": ["workflow", "autonomy", "no-instructions"]
+  }
+]
