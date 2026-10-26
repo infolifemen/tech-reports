@@ -133,14 +133,24 @@ export default function Home() {
     }
   }, []);
 
-  const handleDelete = useCallback(async (id: string) => {
-    const success = await deleteReport(id);
-    if (success) {
-      setReports(prev => prev.filter(r => r.id !== id));
-      setShowModal(false);
-      setEditing(null);
-    } else {
-      alert('Ошибка удаления');
+  const handleDelete = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      console.log('[handleDelete] calling deleteReport for id:', id);
+      const result = await deleteReport(id);
+      console.log('[handleDelete] result:', result);
+      if (result.success) {
+        setReports(prev => prev.filter(r => r.id !== id));
+        setShowModal(false);
+        setEditing(null);
+        return true;
+      } else {
+        alert(`Ошибка удаления: ${result.error || 'неизвестная ошибка'}`);
+        return false;
+      }
+    } catch (err: any) {
+      console.error('[handleDelete] exception:', err);
+      alert(`Исключение при удалении: ${err?.message || String(err)}`);
+      return false;
     }
   }, []);
 
@@ -357,7 +367,7 @@ function EditModal({ report, allUsers, isNew, onSave, onDelete, onClose }: {
   allUsers: Array<{ username: string; isAdmin: boolean }>;
   isNew: boolean;
   onSave: (r: TechReport) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<TechReport>({
@@ -366,6 +376,7 @@ function EditModal({ report, allUsers, isNew, onSave, onDelete, onClose }: {
     executor_ids: report.executor_ids?.length ? [...report.executor_ids] : [],
   });
   const [showExecutors, setShowExecutors] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, outline: 'none',
@@ -398,6 +409,22 @@ function EditModal({ report, allUsers, isNew, onSave, onDelete, onClose }: {
       ranges[index] = { ...ranges[index], [field]: value };
       return { ...prev, date_ranges: ranges };
     });
+  };
+
+  const handleDeleteClick = async () => {
+    if (!onDelete) return;
+    if (deleting) return;
+    const confirmed = window.confirm(`Удалить отчёт "${form.object || form.report_number || 'без названия'}"?\n\nЭто действие нельзя отменить.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await onDelete(form.id);
+      // onClose is called inside onDelete on success
+    } catch (err: any) {
+      console.error('[EditModal] delete exception:', err);
+      alert(`Ошибка удаления: ${err?.message || String(err)}`);
+      setDeleting(false);
+    }
   };
 
   return (
@@ -574,14 +601,21 @@ function EditModal({ report, allUsers, isNew, onSave, onDelete, onClose }: {
           <div>
             {!isNew && onDelete && (
               <button
-                onClick={() => {
-                  if (window.confirm(`Удалить отчёт "${form.object || form.report_number || 'без названия'}"?\n\nЭто действие нельзя отменить.`)) {
-                    onDelete(form.id);
-                  }
+                onClick={handleDeleteClick}
+                disabled={deleting}
+                style={{
+                  padding: '10px 24px',
+                  background: deleting ? '#fecaca' : '#fee2e2',
+                  color: '#dc2626',
+                  border: '1px solid #fca5a5',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontWeight: 500,
+                  opacity: deleting ? 0.7 : 1,
                 }}
-                style={{ padding: '10px 24px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
               >
-                🗑️ Удалить
+                {deleting ? '⏳ Удаление...' : '🗑️ Удалить'}
               </button>
             )}
           </div>
