@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import AdminPanel from '@/components/AdminPanel';
 import ArchiveModal from '@/components/ArchiveModal';
-import { loadReports, saveReport, archiveReport, generateId } from '@/lib/data';
+import { loadReports, saveReport, archiveReport, deleteReport, generateId } from '@/lib/data';
+import { listUsers } from '@/lib/auth';
 import type { TechReport, ReportFilters, DateRange } from '@/lib/types';
 import {
   STATUS_COLORS, SERVICE_TYPES, RP_STATUS_OPTIONS,
   LETTERS_STATUS_OPTIONS, REPORT_STATUS_OPTIONS, DIRECTION_OPTIONS,
-  EXECUTORS,
 } from '@/lib/types';
 import { logout, getCurrentUser, isAdmin } from '@/lib/auth';
 
@@ -21,11 +21,11 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [headerHeight, setHeaderHeight] = useState(108);
-  const headerRef = useRef<HTMLElement>(null);
+  const [allUsers, setAllUsers] = useState<Array<{ username: string; isAdmin: boolean }>>([]);
 
   useEffect(() => {
     loadReports().then((data) => {
+      // Backward compatibility: set defaults for new fields
       const normalized = data.map(r => ({
         ...r,
         date_ranges: r.date_ranges || [],
@@ -37,29 +37,17 @@ export default function Home() {
     });
   }, []);
 
+  // Load all users for multi-select executor
+  useEffect(() => {
+    listUsers().then(users => setAllUsers(users));
+  }, []);
+
   useEffect(() => {
     const checkHash = () => { setShowAdmin(window.location.hash === '#/admin'); };
     checkHash();
     window.addEventListener('hashchange', checkHash);
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
-
-  // Измеряем высоту header для sticky th
-  useEffect(() => {
-    const measure = () => {
-      if (headerRef.current) {
-        setHeaderHeight(headerRef.current.offsetHeight);
-      }
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    // Повторное измерение после загрузки данных
-    const timer = setTimeout(measure, 100);
-    return () => {
-      window.removeEventListener('resize', measure);
-      clearTimeout(timer);
-    };
-  }, [loaded]);
 
   const uniqueObjects = useMemo(() => Array.from(new Set(reports.map(r => r.object))).filter(Boolean).sort(), [reports]);
   const uniqueStatuses = useMemo(() => Array.from(new Set(reports.map(r => r.report_status))).filter(Boolean).sort(), [reports]);
@@ -75,6 +63,7 @@ export default function Home() {
 
   const filtered = useMemo(() => {
     return reports.filter(r => {
+      // Archive filter
       if (!filters.show_archived && r.archived) return false;
       if (filters.object && r.object !== filters.object) return false;
       if (filters.service_type && r.service_type !== filters.service_type) return false;
@@ -116,36 +105,42 @@ export default function Home() {
   }, []);
 
   const handleSave = useCallback(async (report: TechReport) => {
-    try {
-      const workDatesStr = (report.date_ranges || [])
-        .filter(d => d.from || d.to)
-        .map(d => {
-          const from = d.from ? new Date(d.from).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
-          const to = d.to ? new Date(d.to).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
-          return from && to ? `${from}-${to}` : from || to;
-        })
-        .join(', ');
-      const finalReport = { ...report, work_dates: workDatesStr || report.work_dates };
-      const success = await saveReport(finalReport);
-      if (success) {
-        setReports(prev => {
-          const idx = prev.findIndex(r => r.id === report.id);
-          if (idx >= 0) {
-            const updated = [...prev];
-            updated[idx] = finalReport;
-            return updated;
-          }
-          return [finalReport, ...prev];
-        });
-        setShowModal(false);
-        setEditing(null);
-      } else {
-        alert('Ошибка сохранения. Проверьте подключение к интернету и попробуйте снова.');
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      alert('Критическая ошибка при сохранении:\n' + message);
-      console.error('[handleSave] error:', err);
+    // Build work_dates string from date_ranges for backward compat
+    const workDatesStr = (report.date_ranges || [])
+      .filter(d => d.from || d.to)
+      .map(d => {
+        const from = d.from ? new Date(d.from).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
+        const to = d.to ? new Date(d.to).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
+        return from && to ? `${from}-${to}` : from || to;
+      })
+      .join(', ');
+    const finalReport = { ...report, work_dates: workDatesStr || report.work_dates };
+    const success = await saveReport(finalReport);
+    if (success) {
+      setReports(prev => {
+        const idx = prev.findIndex(r => r.id === report.id);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = finalReport;
+          return updated;
+        }
+        return [finalReport, ...prev];
+      });
+      setShowModal(false);
+      setEditing(null);
+    } else {
+      alert('Ошибка сохранения');
+    }
+  }, []);
+
+  const handleDelete = useCallback(async (id: string) => {
+    const success = await deleteReport(id);
+    if (success) {
+      setReports(prev => prev.filter(r => r.id !== id));
+      setShowModal(false);
+      setEditing(null);
+    } else {
+      alert('Ошибка удаления');
     }
   }, []);
 
@@ -181,13 +176,13 @@ export default function Home() {
       {showAdmin ? (
         <AdminPanel onBack={() => { window.location.hash = ''; setShowAdmin(false); }} />
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f0eeeb' }}>
         {/* STICKY HEADER */}
-        <header ref={headerRef} style={{
+        <header style={{
           position: 'sticky',
           top: 0,
           zIndex: 30,
-          background: 'rgba(255,255,255,0.95)',
+          background: 'rgba(255,255,255,0.92)',
           backdropFilter: 'blur(16px)',
           borderBottom: '1px solid rgba(0,0,0,0.06)',
           boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
@@ -234,7 +229,7 @@ export default function Home() {
           <div style={{ display: 'flex', gap: 8, padding: '8px 20px', background: 'rgba(255,255,255,0.5)', borderBottom: '1px solid rgba(0,0,0,0.04)', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
-              placeholder="🔍"
+              placeholder="🔍 Поиск..."
               value={filters.search}
               onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
               style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, minWidth: 150 }}
@@ -267,7 +262,7 @@ export default function Home() {
         </header>
 
         {/* TABLE */}
-        <div style={{ padding: '12px 20px' }}>
+        <div style={{ flex: 1, padding: '12px 20px', overflow: 'auto' }}>
           {!loaded ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>Загрузка...</div>
           ) : filtered.length === 0 ? (
@@ -291,17 +286,17 @@ export default function Home() {
               </colgroup>
               <thead>
                 <tr>
-                  <th style={{ top: headerHeight }}>Объект</th>
-                  <th style={{ top: headerHeight }}>Вид услуг</th>
-                  <th style={{ top: headerHeight }}>Оборудование</th>
-                  <th style={{ top: headerHeight }}>РП/ППР</th>
-                  <th style={{ top: headerHeight }}>Письма</th>
-                  <th style={{ top: headerHeight }}>Даты работ</th>
-                  <th style={{ top: headerHeight }}>Исполнители</th>
-                  <th style={{ top: headerHeight }}>№ отчёта</th>
-                  <th style={{ top: headerHeight }}>Статус</th>
-                  <th style={{ top: headerHeight }}>Отправлено</th>
-                  <th style={{ top: headerHeight }}>Примечание</th>
+                  <th>Объект</th>
+                  <th>Вид услуг</th>
+                  <th>Оборудование</th>
+                  <th>РП/ППР</th>
+                  <th>Письма</th>
+                  <th>Даты работ</th>
+                  <th>Исполнители</th>
+                  <th>№ отчёта</th>
+                  <th>Статус</th>
+                  <th>Отправлено</th>
+                  <th>Примечание</th>
                 </tr>
               </thead>
               <tbody>
@@ -333,8 +328,10 @@ export default function Home() {
         {showModal && editing && (
           <EditModal
             report={editing}
+            allUsers={allUsers}
             isNew={!reports.find(r => r.id === editing.id)}
             onSave={handleSave}
+            onDelete={handleDelete}
             onClose={() => { setShowModal(false); setEditing(null); }}
           />
         )}
@@ -355,10 +352,12 @@ export default function Home() {
 
 // ===== EDIT MODAL =====
 
-function EditModal({ report, isNew, onSave, onClose }: {
+function EditModal({ report, allUsers, isNew, onSave, onDelete, onClose }: {
   report: TechReport;
+  allUsers: Array<{ username: string; isAdmin: boolean }>;
   isNew: boolean;
   onSave: (r: TechReport) => void;
+  onDelete?: (id: string) => void;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<TechReport>({
@@ -367,7 +366,6 @@ function EditModal({ report, isNew, onSave, onClose }: {
     executor_ids: report.executor_ids?.length ? [...report.executor_ids] : [],
   });
   const [showExecutors, setShowExecutors] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, outline: 'none',
@@ -375,16 +373,18 @@ function EditModal({ report, isNew, onSave, onClose }: {
   const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer' };
   const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: '#5a5a72', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.03em' };
 
-  const toggleExecutor = (initials: string) => {
+  // Toggle executor
+  const toggleExecutor = (username: string) => {
     setForm(prev => {
       const ids = prev.executor_ids || [];
-      const has = ids.includes(initials);
-      const newIds = has ? ids.filter(id => id !== initials) : [...ids, initials];
-      const names = newIds.join(', ');
+      const has = ids.includes(username);
+      const newIds = has ? ids.filter(id => id !== username) : [...ids, username];
+      const names = allUsers.filter(u => newIds.includes(u.username)).map(u => u.username).join(', ');
       return { ...prev, executor_ids: newIds, executor: names };
     });
   };
 
+  // Date ranges
   const addDateRange = () => {
     if ((form.date_ranges || []).length >= 6) return;
     setForm(prev => ({ ...prev, date_ranges: [...(prev.date_ranges || []), { from: '', to: '' }] }));
@@ -398,17 +398,6 @@ function EditModal({ report, isNew, onSave, onClose }: {
       ranges[index] = { ...ranges[index], [field]: value };
       return { ...prev, date_ranges: ranges };
     });
-  };
-
-  const handleSaveClick = async () => {
-    setSaving(true);
-    try {
-      await onSave({ ...form, updated_at: new Date().toISOString() });
-    } catch (err) {
-      console.error('[EditModal] save error:', err);
-    } finally {
-      setSaving(false);
-    }
   };
 
   return (
@@ -429,7 +418,7 @@ function EditModal({ report, isNew, onSave, onClose }: {
           {/* 1. Объект */}
           <div>
             <label style={labelStyle}>Объект</label>
-            <input type="text" value={form.object} onChange={e => setForm(prev => ({ ...prev, object: e.target.value }))} style={inputStyle} />
+            <input type="text" value={form.object} onChange={e => setForm(prev => ({ ...prev, object: e.target.value }))} style={inputStyle} placeholder="Красноярская ТЭЦ-3" />
           </div>
 
           {/* 2. Вид услуг */}
@@ -444,7 +433,7 @@ function EditModal({ report, isNew, onSave, onClose }: {
           {/* 3. Оборудование */}
           <div>
             <label style={labelStyle}>Оборудование</label>
-            <input type="text" value={form.equipment} onChange={e => setForm(prev => ({ ...prev, equipment: e.target.value }))} style={inputStyle} />
+            <input type="text" value={form.equipment} onChange={e => setForm(prev => ({ ...prev, equipment: e.target.value }))} style={inputStyle} placeholder="ТГ-1" />
           </div>
 
           {/* 4. РП/ППР */}
@@ -468,7 +457,7 @@ function EditModal({ report, isNew, onSave, onClose }: {
           {/* 8. № отчёта */}
           <div>
             <label style={labelStyle}>№ отчёта</label>
-            <input type="text" value={form.report_number} onChange={e => setForm(prev => ({ ...prev, report_number: e.target.value }))} style={inputStyle} />
+            <input type="text" value={form.report_number} onChange={e => setForm(prev => ({ ...prev, report_number: e.target.value }))} style={inputStyle} placeholder="106-25" />
           </div>
 
           {/* 9. Статус отчёта */}
@@ -480,7 +469,7 @@ function EditModal({ report, isNew, onSave, onClose }: {
             </select>
           </div>
 
-          {/* 10. Отправлено */}
+          {/* 10. Отправлено (бывшее "Направление") */}
           <div>
             <label style={labelStyle}>Отправлено</label>
             <select value={form.direction} onChange={e => setForm(prev => ({ ...prev, direction: e.target.value }))} style={selectStyle}>
@@ -489,7 +478,7 @@ function EditModal({ report, isNew, onSave, onClose }: {
             </select>
           </div>
 
-          {/* 6. Даты работ */}
+          {/* 6. Даты работ — до 6 периодов */}
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>Даты работ (до 6 периодов)</label>
             {(form.date_ranges || []).map((range, idx) => (
@@ -512,7 +501,7 @@ function EditModal({ report, isNew, onSave, onClose }: {
             )}
           </div>
 
-          {/* 7. Исполнители */}
+          {/* 7. Исполнители — мульти-выбор */}
           <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
             <label style={labelStyle}>Исполнители (мульти-выбор)</label>
             <div className="executor-multi-select">
@@ -544,21 +533,26 @@ function EditModal({ report, isNew, onSave, onClose }: {
               </div>
               {showExecutors && (
                 <div className="executor-dropdown">
-                  {EXECUTORS.map(initials => (
-                    <div
-                      key={initials}
-                      className="executor-option"
-                      onClick={() => toggleExecutor(initials)}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={(form.executor_ids || []).includes(initials)}
-                        readOnly
-                        style={{ accentColor: '#2563eb' }}
-                      />
-                      <span style={{ fontSize: 13, fontWeight: 500 }}>{initials}</span>
-                    </div>
-                  ))}
+                  {allUsers.length === 0 ? (
+                    <div style={{ padding: '12px', color: '#9ca3af', fontSize: 12, textAlign: 'center' }}>Загрузка пользователей...</div>
+                  ) : (
+                    allUsers.map(u => (
+                      <div
+                        key={u.username}
+                        className="executor-option"
+                        onClick={() => toggleExecutor(u.username)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(form.executor_ids || []).includes(u.username)}
+                          readOnly
+                          style={{ accentColor: '#2563eb' }}
+                        />
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{u.username}</span>
+                        {u.isAdmin && <span style={{ fontSize: 10, color: '#2563eb' }}>админ</span>}
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -576,27 +570,32 @@ function EditModal({ report, isNew, onSave, onClose }: {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
-          <button onClick={onClose} style={{ padding: '10px 24px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
-            Отмена
-          </button>
-          <button
-            onClick={handleSaveClick}
-            disabled={saving}
-            style={{
-              padding: '10px 24px',
-              background: saving ? '#93c5fd' : '#2563eb',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.7 : 1,
-            }}
-          >
-            {saving ? '💾 Сохранение...' : '💾 Сохранить'}
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
+          <div>
+            {!isNew && onDelete && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Удалить отчёт "${form.object || form.report_number || 'без названия'}"?\n\nЭто действие нельзя отменить.`)) {
+                    onDelete(form.id);
+                  }
+                }}
+                style={{ padding: '10px 24px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
+              >
+                🗑️ Удалить
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button onClick={onClose} style={{ padding: '10px 24px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
+              Отмена
+            </button>
+            <button
+              onClick={() => onSave({ ...form, updated_at: new Date().toISOString() })}
+              style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              💾 Сохранить
+            </button>
+          </div>
         </div>
       </div>
     </div>

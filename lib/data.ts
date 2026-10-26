@@ -66,6 +66,16 @@ export async function archiveReport(id: string, archived: boolean): Promise<bool
   return true;
 }
 
+export async function deleteReport(id: string): Promise<boolean> {
+  const supabase = createClient();
+  const { error } = await supabase.from("tech_reports").delete().eq("id", id);
+  if (error) {
+    console.error("[deleteReport] error:", error.message);
+    return false;
+  }
+  return true;
+}
+
 export function generateId(): string {
   return crypto.randomUUID();
 }
