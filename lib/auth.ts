@@ -37,7 +37,7 @@ function getStoredSession(): StoredSession | null {
 }
 
 function storeSession(session: StoredSession): void {
-  if (typeof window === "undefined") return;
+  if (typeof window !== "undefined") return;
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
@@ -48,137 +48,57 @@ export async function login(username: string, password: string): Promise<boolean
       p_username: username,
       p_password: password,
     });
-    if (error || !data) {
-      console.warn("[login] RPC error:", error?.message);
-      return false;
-    }
-    const result = data as {
-      ok: boolean;
-      session_token?: string;
-      username?: string;
-      is_admin?: boolean;
-      error?: string;
-    };
-    if (!result.ok) {
-      console.warn("[login] Server error:", result.error);
-      return false;
-    }
-    storeSession({
-      token: result.session_token!,
-      username: result.username!,
-      isAdmin: !!result.is_admin,
-      expires: Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-    });
+    if (error || !data) { console.warn("[login] RPC error:", error?.message); return false; }
+    const result = data as { ok: boolean; session_token?: string; username?: string; is_admin?: boolean; error?: string };
+    if (!result.ok) { console.warn("[login] Server error:", result.error); return false; }
+    storeSession({ token: result.session_token!, username: result.username!, isAdmin: !!result.is_admin, expires: Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000 });
     return true;
-  } catch (e) {
-    console.error("[login] Fatal:", e);
-    return false;
-  }
+  } catch (e) { console.error("[login] Fatal:", e); return false; }
 }
 
 export function logout(): void {
   const session = getStoredSession();
-  if (session) {
-    try {
-      const supabase = createSupabaseClient();
-      supabase.rpc("app_logout", { p_token: session.token }).catch(() => {});
-    } catch {
-      // ignore
-    }
-  }
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(SESSION_KEY);
-  }
+  if (session) { try { const supabase = createSupabaseClient(); supabase.rpc("app_logout", { p_token: session.token }).catch(() => {}); } catch { /* ignore */ } }
+  if (typeof window !== "undefined") { localStorage.removeItem(SESSION_KEY); }
 }
 
-export function isLoggedIn(): boolean {
-  return getStoredSession() !== null;
-}
+export function isLoggedIn(): boolean { return getStoredSession() !== null; }
+export function getCurrentUser(): string | null { return getStoredSession()?.username ?? null; }
+export function isAdmin(): boolean { return getStoredSession()?.isAdmin ?? false; }
 
-export function getCurrentUser(): string | null {
-  return getStoredSession()?.username ?? null;
-}
-
-export function isAdmin(): boolean {
-  return getStoredSession()?.isAdmin ?? false;
-}
-
-export async function listUsers(): Promise<
-  Array<{ username: string; isAdmin: boolean }>
-> {
+export async function listUsers(): Promise<Array<{ username: string; isAdmin: boolean }>> {
   const session = getStoredSession();
   if (!session) return [];
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_list_users", {
-      p_token: session.token,
-    });
-    if (error || !data) {
-      console.warn("[listUsers] error:", error?.message);
-      return [];
-    }
-    const result = data as {
-      ok: boolean;
-      users?: Array<{ username: string; is_admin: boolean }>;
-      error?: string;
-    };
+    const { data, error } = await supabase.rpc("app_list_users", { p_token: session.token });
+    if (error || !data) { console.warn("[listUsers] error:", error?.message); return []; }
+    const result = data as { ok: boolean; users?: Array<{ username: string; is_admin: boolean }>; error?: string };
     if (!result.ok) return [];
-    return (result.users || []).map((u) => ({
-      username: u.username,
-      isAdmin: u.is_admin,
-    }));
-  } catch (e) {
-    console.error("[listUsers] fatal:", e);
-    return [];
-  }
+    return (result.users || []).map((u) => ({ username: u.username, isAdmin: u.is_admin }));
+  } catch (e) { console.error("[listUsers] fatal:", e); return []; }
 }
 
-export async function addUser(
-  username: string,
-  password: string,
-  isAdminUser: boolean = false
-): Promise<boolean> {
+export async function addUser(username: string, password: string, isAdminUser: boolean = false): Promise<boolean> {
   const session = getStoredSession();
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_upsert_user", {
-      p_token: session.token,
-      p_username: username,
-      p_password: password,
-      p_is_admin: isAdminUser,
-    });
-    if (error || !data) {
-      console.warn("[addUser] error:", error?.message);
-      return false;
-    }
+    const { data, error } = await supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: password, p_is_admin: isAdminUser });
+    if (error || !data) { console.warn("[addUser] error:", error?.message); return false; }
     return (data as { ok: boolean }).ok;
-  } catch (e) {
-    console.error("[addUser] fatal:", e);
-    return false;
-  }
+  } catch (e) { console.error("[addUser] fatal:", e); return false; }
 }
 
-export async function updatePassword(
-  username: string,
-  newPassword: string
-): Promise<boolean> {
+export async function updatePassword(username: string, newPassword: string): Promise<boolean> {
   const session = getStoredSession();
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_upsert_user", {
-      p_token: session.token,
-      p_username: username,
-      p_password: newPassword,
-      p_is_admin: isAdmin(),
-    });
+    const { data, error } = await supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: newPassword, p_is_admin: isAdmin() });
     if (error || !data) return false;
     return (data as { ok: boolean }).ok;
-  } catch (e) {
-    console.error("[updatePassword] fatal:", e);
-    return false;
-  }
+  } catch (e) { console.error("[updatePassword] fatal:", e); return false; }
 }
 
 export async function removeUser(username: string): Promise<boolean> {
@@ -186,36 +106,36 @@ export async function removeUser(username: string): Promise<boolean> {
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_delete_user", {
-      p_token: session.token,
-      p_username: username,
-    });
+    const { data, error } = await supabase.rpc("app_delete_user", { p_token: session.token, p_username: username });
     if (error || !data) return false;
     return (data as { ok: boolean }).ok;
-  } catch (e) {
-    console.error("[removeUser] fatal:", e);
-    return false;
+  } catch (e) { console.error("[removeUser] fatal:", e); return false; }
+}
+
+export async function migrateLocalUsersToCloud(): Promise<{ migrated: number; errors: string[] }> {
+  const session = getStoredSession();
+  if (!session) return { migrated: 0, errors: ["Не авторизован"] };
+  let localUsers: User[] = [];
+  try { const raw = localStorage.getItem("tech_reports_auth_users"); if (raw) localUsers = JSON.parse(raw); } catch { return { migrated: 0, errors: ["Не удалось прочитать локальных пользователей"] }; }
+  if (localUsers.length === 0) return { migrated: 0, errors: ["Нет локальных пользователей для миграции"] };
+  const supabase = createSupabaseClient();
+  let migrated = 0; const errors: string[] = [];
+  for (const user of localUsers) {
+    try {
+      const { data, error } = await supabase.rpc("app_import_user", { p_token: session.token, p_username: user.username, p_password_hash: user.passwordHash, p_salt: user.salt, p_is_admin: user.isAdmin || false });
+      if (error || !data || !(data as { ok: boolean }).ok) { errors.push(`${user.username}: ${error?.message || (data as { error?: string })?.error || "неизвестная ошибка"}`); } else { migrated++; }
+    } catch (e) { errors.push(`${user.username}: ${e instanceof Error ? e.message : String(e)}`); }
   }
+  if (migrated > 0) { try { localStorage.removeItem("tech_reports_auth_users"); } catch { /* ignore */ } }
+  return { migrated, errors };
 }
 
-// No-op for compatibility
-export async function initializeDefaultUsers(): Promise<void> {
-  return;
-}
+export async function initializeDefaultUsers(): Promise<void> { return; }
 
-export async function hashPassword(
-  password: string,
-  salt?: string
-): Promise<{ hash: string; salt: string }> {
-  const saltToUse =
-    salt ||
-    Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+export async function hashPassword(password: string, salt?: string): Promise<{ hash: string; salt: string }> {
+  const saltToUse = salt || Array.from(crypto.getRandomValues(new Uint8Array(16))).map((b) => b.toString(16).padStart(2, "0")).join("");
   const msgBuffer = new TextEncoder().encode(password + saltToUse);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-  const hash = Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const hash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
   return { hash, salt: saltToUse };
 }
