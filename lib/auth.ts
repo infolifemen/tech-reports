@@ -1,3 +1,6 @@
+// Cloud-based authentication using Supabase RPC
+// Shared with trip-schedule — same users database
+
 import { createSupabaseClient } from "./supabase-browser";
 
 const SESSION_KEY = "tech_reports_auth_session";
@@ -100,26 +103,41 @@ export function isAdmin(): boolean {
   return getStoredSession()?.isAdmin ?? false;
 }
 
-export async function listUsers(): Promise<Array<{ username: string; isAdmin: boolean }>> {
+export async function listUsers(): Promise<
+  Array<{ username: string; isAdmin: boolean }>
+> {
   const session = getStoredSession();
   if (!session) return [];
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.rpc("app_list_users", { p_token: session.token });
+    const { data, error } = await supabase.rpc("app_list_users", {
+      p_token: session.token,
+    });
     if (error || !data) {
       console.warn("[listUsers] error:", error?.message);
       return [];
     }
-    const result = data as { ok: boolean; users?: Array<{ username: string; is_admin: boolean }>; error?: string };
+    const result = data as {
+      ok: boolean;
+      users?: Array<{ username: string; is_admin: boolean }>;
+      error?: string;
+    };
     if (!result.ok) return [];
-    return (result.users || []).map((u) => ({ username: u.username, isAdmin: u.is_admin }));
+    return (result.users || []).map((u) => ({
+      username: u.username,
+      isAdmin: u.is_admin,
+    }));
   } catch (e) {
     console.error("[listUsers] fatal:", e);
     return [];
   }
 }
 
-export async function addUser(username: string, password: string, isAdminUser: boolean = false): Promise<boolean> {
+export async function addUser(
+  username: string,
+  password: string,
+  isAdminUser: boolean = false
+): Promise<boolean> {
   const session = getStoredSession();
   if (!session) return false;
   try {
@@ -141,7 +159,10 @@ export async function addUser(username: string, password: string, isAdminUser: b
   }
 }
 
-export async function updatePassword(username: string, newPassword: string): Promise<boolean> {
+export async function updatePassword(
+  username: string,
+  newPassword: string
+): Promise<boolean> {
   const session = getStoredSession();
   if (!session) return false;
   try {
@@ -177,14 +198,24 @@ export async function removeUser(username: string): Promise<boolean> {
   }
 }
 
+// No-op for compatibility
 export async function initializeDefaultUsers(): Promise<void> {
   return;
 }
 
-export async function hashPassword(password: string, salt?: string): Promise<{ hash: string; salt: string }> {
-  const saltToUse = salt || Array.from(crypto.getRandomValues(new Uint8Array(16))).map((b) => b.toString(16).padStart(2, "0")).join("");
+export async function hashPassword(
+  password: string,
+  salt?: string
+): Promise<{ hash: string; salt: string }> {
+  const saltToUse =
+    salt ||
+    Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   const msgBuffer = new TextEncoder().encode(password + saltToUse);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-  const hash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hash = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
   return { hash, salt: saltToUse };
 }

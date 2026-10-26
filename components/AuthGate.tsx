@@ -10,6 +10,10 @@ function getAuthCookie(): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
+/**
+ * Cookie-based auth gate for GitHub Pages (static deploy).
+ * Falls back to this when Supabase RPC is not available.
+ */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -25,7 +29,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (authorized === null) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0eeeb', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: '#6b7280', fontSize: 14 }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#f0eeeb',
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+          color: '#6b7280',
+          fontSize: 14,
+        }}
+      >
         Проверка авторизации…
       </div>
     );

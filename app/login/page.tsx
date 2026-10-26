@@ -42,6 +42,7 @@ export default function LoginPage() {
       return;
     }
 
+    // GitHub Pages — проверка через NEXT_PUBLIC_SITE_PASSWORD
     const sitePassword = process.env.NEXT_PUBLIC_SITE_PASSWORD || 'grafik2026';
     if (password === sitePassword) {
       setAuthCookie('authenticated');
@@ -55,31 +56,139 @@ export default function LoginPage() {
 
   if (checkingSession) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0eeeb', fontFamily: "'Inter', sans-serif", color: '#6b7280', fontSize: 14 }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#f0eeeb',
+          fontFamily: "'Inter', sans-serif",
+          color: '#6b7280',
+          fontSize: 14,
+        }}
+      >
         Проверка сессии…
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0eeeb', fontFamily: "'Inter', sans-serif" }}>
-      <div style={{ maxWidth: '400px', width: '100%', padding: '32px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 'bold', textAlign: 'center', marginBottom: '8px', color: '#1a1a1a' }}>📋 Тех. отчёты</h2>
-        <p style={{ fontSize: '14px', textAlign: 'center', marginBottom: '24px', color: '#6b7280' }}>Войдите для доступа к системе</p>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f0eeeb',
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '400px',
+          width: '100%',
+          padding: '32px',
+          background: 'white',
+          borderRadius: '12px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+        }}
+      >
+        <h2
+          style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            marginBottom: '8px',
+            color: '#1a1a1a',
+          }}
+        >
+          📋 Тех. отчёты
+        </h2>
+        <p
+          style={{
+            fontSize: '14px',
+            textAlign: 'center',
+            marginBottom: '24px',
+            color: '#6b7280',
+          }}
+        >
+          Войдите для доступа к системе
+        </p>
 
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: '16px' }}>
-            <label htmlFor="password" style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>Пароль</label>
-            <input id="password" type="password" required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '8px', outline: 'none', boxSizing: 'border-box' }} placeholder="Введите пароль" autoComplete="current-password" />
+            <label
+              htmlFor="password"
+              style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                marginBottom: '8px',
+                color: '#374151',
+              }}
+            >
+              Пароль
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              autoFocus
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+              placeholder="Введите пароль"
+              autoComplete="current-password"
+            />
           </div>
 
           {error && (
-            <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '16px', color: '#dc2626', fontSize: '14px' }}>
+            <div
+              style={{
+                padding: '12px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                color: '#dc2626',
+                fontSize: '14px',
+              }}
+            >
               {error}
             </div>
           )}
 
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', fontSize: '16px', fontWeight: '500', background: loading ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', borderRadius: '8px', cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '12px',
+              fontSize: '16px',
+              fontWeight: '500',
+              background: loading ? '#9ca3af' : '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseOver={(e) =>
+              !loading && (e.currentTarget.style.background = '#1d4ed8')
+            }
+            onMouseOut={(e) =>
+              !loading && (e.currentTarget.style.background = '#2563eb')
+            }
+          >
             {loading ? 'Вход...' : 'Войти'}
           </button>
         </form>
