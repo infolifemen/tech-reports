@@ -37,7 +37,7 @@ function getStoredSession(): StoredSession | null {
 }
 
 function storeSession(session: StoredSession): void {
-  if (typeof window !== "undefined") return;
+  if (typeof window === "undefined") return;
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
