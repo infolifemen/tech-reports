@@ -39,12 +39,12 @@ function storeSession(session: StoredSession): void {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`[TIMEOUT] ${label} timeout after ${RPC_TIMEOUT_MS / 1000}s`));
     }, RPC_TIMEOUT_MS);
-    promise
+    Promise.resolve(promise)
       .then((result) => { clearTimeout(timer); resolve(result); })
       .catch((err) => { clearTimeout(timer); reject(err); });
   });
@@ -53,10 +53,12 @@ function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
 export async function login(username: string, password: string): Promise<boolean> {
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await withTimeout(
+    const rpcResult = await withTimeout(
       supabase.rpc("app_login", { p_username: username, p_password: password }),
       "app_login"
     );
+    const data = (rpcResult as any).data;
+    const error = (rpcResult as any).error;
     if (error || !data) { console.warn("[login] RPC error:", error?.message); return false; }
     const result = data as { ok: boolean; session_token?: string; username?: string; is_admin?: boolean; error?: string };
     if (!result.ok) { console.warn("[login] Server error:", result.error); return false; }
@@ -82,10 +84,12 @@ export async function listUsers(): Promise<Array<{ username: string; isAdmin: bo
   if (!session) return [];
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await withTimeout(
+    const rpcResult = await withTimeout(
       supabase.rpc("app_list_users", { p_token: session.token }),
       "app_list_users"
     );
+    const data = (rpcResult as any).data;
+    const error = (rpcResult as any).error;
     if (error || !data) { console.warn("[listUsers] error:", error?.message); return []; }
     const result = data as { ok: boolean; users?: Array<{ username: string; is_admin: boolean }>; error?: string };
     if (!result.ok) return [];
@@ -98,10 +102,12 @@ export async function addUser(username: string, password: string, isAdminUser: b
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await withTimeout(
+    const rpcResult = await withTimeout(
       supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: password, p_is_admin: isAdminUser }),
       "app_upsert_user"
     );
+    const data = (rpcResult as any).data;
+    const error = (rpcResult as any).error;
     if (error || !data) { console.warn("[addUser] error:", error?.message); return false; }
     return (data as { ok: boolean }).ok;
   } catch (e) { console.error("[addUser] fatal:", e); return false; }
@@ -112,10 +118,12 @@ export async function updatePassword(username: string, newPassword: string): Pro
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await withTimeout(
+    const rpcResult = await withTimeout(
       supabase.rpc("app_upsert_user", { p_token: session.token, p_username: username, p_password: newPassword, p_is_admin: isAdmin() }),
       "app_upsert_user (updatePassword)"
     );
+    const data = (rpcResult as any).data;
+    const error = (rpcResult as any).error;
     if (error || !data) return false;
     return (data as { ok: boolean }).ok;
   } catch (e) { console.error("[updatePassword] fatal:", e); return false; }
@@ -126,10 +134,12 @@ export async function removeUser(username: string): Promise<boolean> {
   if (!session) return false;
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await withTimeout(
+    const rpcResult = await withTimeout(
       supabase.rpc("app_delete_user", { p_token: session.token, p_username: username }),
       "app_delete_user"
     );
+    const data = (rpcResult as any).data;
+    const error = (rpcResult as any).error;
     if (error || !data) return false;
     return (data as { ok: boolean }).ok;
   } catch (e) { console.error("[removeUser] fatal:", e); return false; }
