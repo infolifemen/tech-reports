@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import AdminPanel from '@/components/AdminPanel';
 import { ArchiveModal, type ArchiveObject } from '@/components/ArchiveModal';
-import { loadReports, saveReport, deleteReport, generateId } from '@/lib/data';
+import { loadReports, saveReport, generateId } from '@/lib/data';
 import type { TechReport, ReportFilters } from '@/lib/types';
 import { STATUS_COLORS, SERVICE_TYPES } from '@/lib/types';
 import { logout, getCurrentUser, isAdmin } from '@/lib/auth';
@@ -164,14 +164,6 @@ export default function Home() {
       setEditing(null);
     } else {
       alert('Ошибка сохранения');
-    }
-  }, []);
-
-  const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Удалить отчёт?')) return;
-    const success = await deleteReport(id);
-    if (success) {
-      setReports(prev => prev.filter(r => r.id !== id));
     }
   }, []);
 
@@ -491,7 +483,6 @@ export default function Home() {
                   <th>Статус</th>
                   <th>Направление</th>
                   <th>Примечание</th>
-                  <th style={{ width: 80 }}>Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -513,14 +504,6 @@ export default function Home() {
                     <td><StatusBadge status={r.report_status} /></td>
                     <td>{r.direction}</td>
                     <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes}>{r.notes}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        style={{ padding: '4px 8px', background: '#fee', color: '#c33', border: '1px solid #fcc', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
-                      >
-                        Удалить
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
