@@ -33,3 +33,23 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Import scripts (already executed, no longer needed)
+import_*.js
+import_*.json
+check_*.js
+check_*.py
+read_excel*.ps1
+read_excel*.py
+temp_*.py
+
+# Log files
+build_log.txt
+npm_install_log.txt
+*.log
+
+# Data files
+data.xlsx
+
+# Old project structure (deprecated)
+tech_reports/
