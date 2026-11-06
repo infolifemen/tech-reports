@@ -217,7 +217,6 @@ export default function Home() {
           border: `1px solid ${color}40`,
         }}
       >
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, marginRight: 6 }} />
         {status || '—'}
       </span>
     );
@@ -471,7 +470,7 @@ export default function Home() {
         </div>
 
         {/* Table */}
-        <div style={{ flex: 1, padding: '16px 24px', overflow: 'auto' }}>
+        <div style={{ flex: 1, padding: '16px 24px' }}>
           {!loaded ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>Загрузка...</div>
           ) : filtered.length === 0 ? (
@@ -479,7 +478,18 @@ export default function Home() {
               {reports.length === 0 ? 'Нет данных. Добавьте первый отчёт или импортируйте из Excel.' : showArchived ? '📦 Архив пуст.' : 'Нет записей по выбранным фильтрам.'}
             </div>
           ) : (
-            <table className="report-table" style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <table className="report-table" style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '22%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Объект</th>
@@ -496,10 +506,10 @@ export default function Home() {
               <tbody>
                 {filtered.map(r => (
                   <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => handleEdit(r)}>
-                    <td style={{ fontWeight: 500, verticalAlign: 'top', whiteSpace: 'normal', overflow: 'visible', maxWidth: 300 }}>
-                      <div>{r.object}</div>
+                    <td style={{ fontWeight: 500, verticalAlign: 'top', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.object}</div>
                       {(r.service_type || r.equipment) && (
-                        <div style={{ fontSize: 11, color: '#8e8ea0', fontWeight: 400, marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: '#8e8ea0', fontWeight: 400, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {[r.service_type, r.equipment].filter(Boolean).join(' · ')}
                         </div>
                       )}
@@ -507,11 +517,11 @@ export default function Home() {
                     <td><StatusBadge status={r.rp_status} /></td>
                     <td><StatusBadge status={r.letters_status} /></td>
                     <td style={{ whiteSpace: 'nowrap' }}>{r.work_dates}</td>
-                    <td>{r.executor}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.report_number}</td>
+                    <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.executor}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{r.report_number}</td>
                     <td><StatusBadge status={r.report_status} /></td>
-                    <td>{r.direction}</td>
-                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes}>{r.notes}</td>
+                    <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.direction}</td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes}>{r.notes}</td>
                   </tr>
                 ))}
               </tbody>
