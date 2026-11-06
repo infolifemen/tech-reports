@@ -478,17 +478,17 @@ export default function Home() {
               {reports.length === 0 ? 'Нет данных. Добавьте первый отчёт или импортируйте из Excel.' : showArchived ? '📦 Архив пуст.' : 'Нет записей по выбранным фильтрам.'}
             </div>
           ) : (
-            <table className="report-table" style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
+            <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
               <colgroup>
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '9%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
                 <col style={{ width: '8%' }} />
                 <col style={{ width: '8%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '22%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '11%' }} />
               </colgroup>
               <thead>
                 <tr>
