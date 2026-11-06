@@ -491,13 +491,12 @@ export default function Home() {
                   <th>Статус</th>
                   <th>Направление</th>
                   <th>Примечание</th>
-                  <th style={{ width: 80 }}>Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(r => (
                   <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => handleEdit(r)}>
-                    <td style={{ fontWeight: 500, verticalAlign: 'top' }}>
+                    <td style={{ fontWeight: 500, verticalAlign: 'top', whiteSpace: 'normal', overflow: 'visible', maxWidth: 300 }}>
                       <div>{r.object}</div>
                       {(r.service_type || r.equipment) && (
                         <div style={{ fontSize: 11, color: '#8e8ea0', fontWeight: 400, marginTop: 2 }}>
@@ -513,14 +512,6 @@ export default function Home() {
                     <td><StatusBadge status={r.report_status} /></td>
                     <td>{r.direction}</td>
                     <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes}>{r.notes}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        style={{ padding: '4px 8px', background: '#fee', color: '#c33', border: '1px solid #fcc', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}
-                      >
-                        Удалить
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -534,6 +525,7 @@ export default function Home() {
             report={editing}
             isNew={!reports.find(r => r.id === editing.id)}
             onSave={handleSave}
+            onDelete={handleDelete}
             onClose={() => { setShowModal(false); setEditing(null); }}
           />
         )}
@@ -555,10 +547,11 @@ export default function Home() {
 }
 
 // === EDIT MODAL ===
-function EditModal({ report, isNew, onSave, onClose }: {
+function EditModal({ report, isNew, onSave, onDelete, onClose }: {
   report: TechReport;
   isNew: boolean;
   onSave: (r: TechReport) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<TechReport>({ ...report });
@@ -640,19 +633,31 @@ function EditModal({ report, isNew, onSave, onClose }: {
             />
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-          <button
-            onClick={onClose}
-            style={{ padding: '10px 24px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
-          >
-            Отмена
-          </button>
-          <button
-            onClick={() => onSave({ ...form, updated_at: new Date().toISOString() })}
-            style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-          >
-            💾 Сохранить
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
+          <div>
+            {!isNew && (
+              <button
+                onClick={() => { if (confirm('Удалить этот отчёт?')) { onDelete(report.id); onClose(); } }}
+                style={{ padding: '10px 24px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+              >
+                🗑 Удалить
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={onClose}
+              style={{ padding: '10px 24px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
+            >
+              Отмена
+            </button>
+            <button
+              onClick={() => onSave({ ...form, updated_at: new Date().toISOString() })}
+              style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            >
+              💾 Сохранить
+            </button>
+          </div>
         </div>
       </div>
     </div>
