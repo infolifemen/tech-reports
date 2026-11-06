@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import AdminPanel from '@/components/AdminPanel';
 import { ArchiveModal, type ArchiveObject } from '@/components/ArchiveModal';
-import { loadReports, saveReport, deleteReport, generateId } from '@/lib/data';
+import { loadReports, saveReport, generateId } from '@/lib/data';
 import type { TechReport, ReportFilters } from '@/lib/types';
 import { STATUS_COLORS, SERVICE_TYPES } from '@/lib/types';
 import { logout, getCurrentUser, isAdmin } from '@/lib/auth';
@@ -164,14 +164,6 @@ export default function Home() {
       setEditing(null);
     } else {
       alert('Ошибка сохранения');
-    }
-  }, []);
-
-  const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Удалить отчёт?')) return;
-    const success = await deleteReport(id);
-    if (success) {
-      setReports(prev => prev.filter(r => r.id !== id));
     }
   }, []);
 
