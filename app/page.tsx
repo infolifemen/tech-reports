@@ -240,7 +240,7 @@ export default function Home() {
       {showAdmin ? (
         <AdminPanel onBack={() => { window.location.hash = ''; setShowAdmin(false); }} />
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f0eeeb' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f0eeeb', overflow: 'hidden' }}>
         {/* Header */}
         <header style={{
           position: 'relative',
@@ -480,15 +480,15 @@ export default function Home() {
           ) : (
             <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
               <colgroup>
-                <col style={{ width: '15%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '8%' }} />
                 <col style={{ width: '9%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '10%' }} />
                 <col style={{ width: '7%' }} />
                 <col style={{ width: '9%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '24%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '23%' }} />
               </colgroup>
               <thead>
                 <tr>
