@@ -470,7 +470,7 @@ export default function Home() {
         </div>
 
         {/* Table */}
-        <div style={{ flex: 1, padding: '16px 24px' }}>
+        <div style={{ flex: 1, padding: '16px 24px', overflow: 'auto', minHeight: 0 }}>
           {!loaded ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>Загрузка...</div>
           ) : filtered.length === 0 ? (
@@ -480,15 +480,15 @@ export default function Home() {
           ) : (
             <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
               <colgroup>
-                <col style={{ width: '20%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '8%' }} />
+                <col style={{ width: '15%' }} />
                 <col style={{ width: '9%' }} />
-                <col style={{ width: '11%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '24%' }} />
               </colgroup>
               <thead>
                 <tr>
