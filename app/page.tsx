@@ -480,15 +480,15 @@ export default function Home() {
           ) : (
             <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
               <colgroup>
-                <col style={{ width: '18%' }} />
+                <col style={{ width: '19%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '9%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '6%' }} />
                 <col style={{ width: '10%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '15%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '13%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -516,7 +516,7 @@ export default function Home() {
                     </td>
                     <td><StatusBadge status={r.rp_status} /></td>
                     <td><StatusBadge status={r.letters_status} /></td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{r.work_dates}</td>
+                    <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{r.work_dates}</td>
                     <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.executor}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{r.report_number}</td>
                     <td><StatusBadge status={r.report_status} /></td>
