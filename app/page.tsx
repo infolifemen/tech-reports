@@ -9,7 +9,7 @@ import type { TechReport, ReportFilters } from '@/lib/types';
 import { STATUS_COLORS, SERVICE_TYPES } from '@/lib/types';
 import { logout, getCurrentUser, isAdmin } from '@/lib/auth';
 import { Archive, ArchiveRestore, ChevronDown } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useLayoutEffect } from 'react';
 
 // === Archive helpers ===
 const ARCHIVE_STORAGE_KEY = 'tech_reports_archived_ids';
@@ -209,6 +209,20 @@ export default function Home() {
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
+  // === FIXED HEADER: измеряем высоту fixed тулбара для spacer'а ===
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!headerRef.current) return;
+    const el = headerRef.current;
+    const update = () => setHeaderHeight(el.getBoundingClientRect().height);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loaded, reports.length]);
+
   // Status badge component
   const StatusBadge = ({ status }: { status: string }) => {
     const color = STATUS_COLORS[status] || '#94a3b8';
@@ -216,9 +230,16 @@ export default function Home() {
       <span
         className="status-badge"
         style={{
-          background: `${color}18`,
+          background: `${color}20`,
           color: color,
-          border: `1px solid ${color}40`,
+          border: `1px solid ${color}60`,
+          padding: '2px 6px',
+          borderRadius: 6,
+          fontSize: 11,
+          fontWeight: 500,
+          display: 'inline-flex',
+          alignItems: 'center',
+          whiteSpace: 'nowrap',
         }}
       >
         {status || '—'}
@@ -244,11 +265,10 @@ export default function Home() {
       {showAdmin ? (
         <AdminPanel onBack={() => { window.location.hash = ''; setShowAdmin(false); }} />
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', background: '#f0eeeb' }}>
-        {/* Header */}
+      <div style={{ display: 'flex', flexDirection: 'column', background: '#f0eeeb', minHeight: '100vh' }}>
+        {/* FIXED HEADER + FILTERS wrapper */}
+        <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }}>
         <header style={{
-          position: 'relative',
-          zIndex: 100,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -413,7 +433,9 @@ export default function Home() {
           display: 'flex',
           gap: 12,
           padding: '12px 24px',
-          background: 'rgba(255,255,255,0.5)',
+          background: 'rgba(255,255,255,0.85)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           borderBottom: '1px solid rgba(0,0,0,0.06)',
           flexWrap: 'wrap',
           alignItems: 'center',
@@ -472,6 +494,9 @@ export default function Home() {
             </button>
           )}
         </div>
+        </div>
+        {/* Spacer высотой с fixed хедер+фильтры — чтобы контент не прятался под ним */}
+        <div style={{ height: headerHeight, flexShrink: 0 }} />
 
         {/* Table */}
         <div style={{ padding: '16px 24px 40px' }}>
@@ -482,7 +507,7 @@ export default function Home() {
               {reports.length === 0 ? 'Нет данных. Добавьте первый отчёт или импортируйте из Excel.' : showArchived ? '📦 Архив пуст.' : 'Нет записей по выбранным фильтрам.'}
             </div>
           ) : (
-            <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
+            <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%', '--sticky-top': `${headerHeight}px` } as React.CSSProperties}>
               <colgroup>
                 <col style={{ width: '17%' }} />
                 <col style={{ width: '10%' }} />
@@ -524,7 +549,7 @@ export default function Home() {
                     <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.executor}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{r.report_number}</td>
                     <td><StatusBadge status={r.report_status} /></td>
-                    <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.direction}</td>
+                    <td><StatusBadge status={r.direction} /></td>
                     <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{r.notes}</td>
                   </tr>
                 ))}

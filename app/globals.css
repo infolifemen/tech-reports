@@ -44,8 +44,9 @@ body {
 
 .report-table th {
   position: sticky;
-  top: 0;
-  z-index: 2000;
+  /* top задаётся через CSS переменную --sticky-top из inline style */
+  top: var(--sticky-top, 0px);
+  z-index: 50;
   background: #f8f9fb;
   padding: 6px 8px;
   text-align: left;
@@ -128,7 +129,7 @@ body {
 
 .table-container .report-table thead th {
   position: sticky;
-  top: 0;
+  top: var(--sticky-top, 0px);
   z-index: 20;
 }
 
