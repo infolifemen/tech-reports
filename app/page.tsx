@@ -72,6 +72,7 @@ export default function Home() {
   // Unique filter values
   const uniqueObjects = useMemo(() => Array.from(new Set(reports.map(r => r.object))).filter(Boolean).sort(), [reports]);
   const uniqueStatuses = useMemo(() => Array.from(new Set(reports.map(r => r.report_status))).filter(Boolean).sort(), [reports]);
+  const ALL_STATUSES = ['РП', 'Процедура', 'Согласовано', 'Не требуется', 'у Заказчика', 'Требуется', '.pdf', 'Печат верс', 'Распечатать'];
   const uniqueExecutors = useMemo(() => {
     const set = new Set<string>();
     for (const r of reports) {
@@ -449,7 +450,7 @@ export default function Home() {
             style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13 }}
           >
             <option value="">Все статусы</option>
-            {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+            {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select
             value={filters.executor}
@@ -521,7 +522,7 @@ export default function Home() {
                     <td style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{r.report_number}</td>
                     <td><StatusBadge status={r.report_status} /></td>
                     <td style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.direction}</td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes}>{r.notes}</td>
+                    <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{r.notes}</td>
                   </tr>
                 ))}
               </tbody>
