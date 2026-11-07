@@ -9,7 +9,7 @@ import type { TechReport, ReportFilters } from '@/lib/types';
 import { STATUS_COLORS, SERVICE_TYPES } from '@/lib/types';
 import { logout, getCurrentUser, isAdmin } from '@/lib/auth';
 import { Archive, ArchiveRestore, ChevronDown } from 'lucide-react';
-import { useRef, useLayoutEffect } from 'react';
+import { useRef } from 'react';
 
 // === Archive helpers ===
 const ARCHIVE_STORAGE_KEY = 'tech_reports_archived_ids';
@@ -93,7 +93,15 @@ export default function Home() {
 
       if (filters.object && r.object !== filters.object) return false;
       if (filters.service_type && r.service_type !== filters.service_type) return false;
-      if (filters.report_status && r.report_status !== filters.report_status) return false;
+      if (filters.report_status) {
+        if (filters.report_status === '—') {
+          const allStatuses = [r.rp_status, r.letters_status, r.report_status, r.direction].filter(Boolean);
+          if (allStatuses.length > 0) return false;
+        } else {
+          const matches = [r.rp_status, r.letters_status, r.report_status, r.direction].includes(filters.report_status);
+          if (!matches) return false;
+        }
+      }
       if (filters.executor && !(r.executor || '').includes(filters.executor)) return false;
       if (filters.search) {
         const s = filters.search.toLowerCase();
@@ -213,7 +221,7 @@ export default function Home() {
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!headerRef.current) return;
     const el = headerRef.current;
     const update = () => setHeaderHeight(el.getBoundingClientRect().height);
@@ -221,19 +229,18 @@ export default function Home() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [loaded, reports.length]);
+  }, [loaded]);
 
   // Status badge component
   const StatusBadge = ({ status }: { status: string }) => {
     const color = STATUS_COLORS[status] || '#94a3b8';
     return (
       <span
-        className="status-badge"
         style={{
           background: `${color}20`,
           color: color,
           border: `1px solid ${color}60`,
-          padding: '2px 6px',
+          padding: '2px 8px',
           borderRadius: 6,
           fontSize: 11,
           fontWeight: 500,
@@ -475,6 +482,7 @@ export default function Home() {
             style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13 }}
           >
             <option value="">Все статусы</option>
+            <option value="—">— (пустой)</option>
             {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select
