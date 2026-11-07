@@ -150,7 +150,10 @@ export default function Home() {
   }, []);
 
   const handleSave = useCallback(async (report: TechReport) => {
-    const success = await saveReport(report);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Таймаут: сервер не отвечает более 15 сек')), 15000);
+    });
+    const success = await Promise.race([saveReport(report), timeoutPromise]);
     if (success) {
       setReports(prev => {
         const idx = prev.findIndex(r => r.id === report.id);
@@ -164,7 +167,7 @@ export default function Home() {
       setShowModal(false);
       setEditing(null);
     } else {
-      alert('Ошибка сохранения');
+      throw new Error('Сервер вернул ошибку');
     }
   }, []);
 
@@ -241,11 +244,11 @@ export default function Home() {
       {showAdmin ? (
         <AdminPanel onBack={() => { window.location.hash = ''; setShowAdmin(false); }} />
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f0eeeb' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', background: '#f0eeeb' }}>
         {/* Header */}
         <header style={{
           position: 'relative',
-          zIndex: 1000,
+          zIndex: 100,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -566,6 +569,8 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
   onClose: () => void;
 }) {
   const [form, setForm] = useState<TechReport>({ ...report });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const fields: Array<{ key: keyof TechReport; label: string; type?: string }> = [
     { key: 'object', label: 'Объект' },
@@ -594,11 +599,13 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.4)',
+        background: 'rgba(0,0,0,0.5)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 5000,
         padding: 20,
       }}
     >
@@ -680,13 +687,29 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
               Отмена
             </button>
             <button
-              onClick={() => onSave({ ...form, updated_at: new Date().toISOString() })}
-              style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                setSaveError(null);
+                try {
+                  await onSave({ ...form, updated_at: new Date().toISOString() });
+                } catch (err) {
+                  setSaveError(err instanceof Error ? err.message : 'Неизвестная ошибка');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              style={{ padding: '10px 24px', background: saving ? '#93c5fd' : '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}
             >
-              💾 Сохранить
+              {saving ? '⏳ Сохранение...' : '💾 Сохранить'}
             </button>
           </div>
         </div>
+        {saveError && (
+          <div style={{ marginTop: 12, padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>
+            ❌ {saveError}
+          </div>
+        )}
       </div>
     </div>
   );

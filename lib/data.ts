@@ -20,65 +20,66 @@ export async function loadReports(): Promise<TechReport[]> {
 export async function saveReport(report: TechReport): Promise<boolean> {
   const supabase = createClient();
   
-  // Check if exists
-  const { data: existing } = await supabase
-    .from("tech_reports")
-    .select("id")
-    .eq("id", report.id)
-    .single();
+  try {
+    // Check if exists
+    const { data: existing, error: checkError } = await supabase
+      .from("tech_reports")
+      .select("id")
+      .eq("id", report.id)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error("[saveReport] check error:", checkError.message);
+      return false;
+    }
+
+    const payload = {
+      object: report.object,
+      service_type: report.service_type,
+      equipment: report.equipment,
+      rp_status: report.rp_status,
+      letters_status: report.letters_status,
+      work_dates: report.work_dates,
+      executor: report.executor,
+      report_number: report.report_number,
+      report_status: report.report_status,
+      direction: report.direction,
+      notes: report.notes,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existing) {
+      // UPDATE
+      const { error } = await supabase
+        .from("tech_reports")
+        .update(payload)
+        .eq("id", report.id);
   
-  if (existing) {
-    // UPDATE
-    const { error } = await supabase
-      .from("tech_reports")
-      .update({
-        object: report.object,
-        service_type: report.service_type,
-        equipment: report.equipment,
-        rp_status: report.rp_status,
-        letters_status: report.letters_status,
-        work_dates: report.work_dates,
-        executor: report.executor,
-        report_number: report.report_number,
-        report_status: report.report_status,
-        direction: report.direction,
-        notes: report.notes,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", report.id);
-    
-    if (error) {
-      console.error("[saveReport] update error:", error.message);
-      return false;
+      if (error) {
+        console.error("[saveReport] update error:", error.message);
+        return false;
+      }
+    } else {
+      // INSERT
+      const { error } = await supabase
+        .from("tech_reports")
+        .insert({
+          id: report.id,
+          ...payload,
+          created_at: new Date().toISOString(),
+        });
+  
+      if (error) {
+        console.error("[saveReport] insert error:", error.message);
+        return false;
+      }
     }
-  } else {
-    // INSERT
-    const { error } = await supabase
-      .from("tech_reports")
-      .insert({
-        id: report.id,
-        object: report.object,
-        service_type: report.service_type,
-        equipment: report.equipment,
-        rp_status: report.rp_status,
-        letters_status: report.letters_status,
-        work_dates: report.work_dates,
-        executor: report.executor,
-        report_number: report.report_number,
-        report_status: report.report_status,
-        direction: report.direction,
-        notes: report.notes,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
     
-    if (error) {
-      console.error("[saveReport] insert error:", error.message);
-      return false;
-    }
+    return true;
+  } catch (err) {
+    console.error("[saveReport] unexpected error:", err);
+    return false;
   }
-  
-  return true;
 }
 
 // === DELETE ===
