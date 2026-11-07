@@ -30,7 +30,7 @@ export async function saveReport(report: TechReport): Promise<boolean> {
     
     if (checkError) {
       console.error("[saveReport] check error:", checkError.message);
-      return false;
+      throw new Error(`Ошибка проверки: ${checkError.message}`);
     }
 
     const payload = {
@@ -57,7 +57,7 @@ export async function saveReport(report: TechReport): Promise<boolean> {
   
       if (error) {
         console.error("[saveReport] update error:", error.message);
-        return false;
+        throw new Error(`Ошибка обновления: ${error.message}`);
       }
     } else {
       // INSERT
@@ -71,14 +71,14 @@ export async function saveReport(report: TechReport): Promise<boolean> {
   
       if (error) {
         console.error("[saveReport] insert error:", error.message);
-        return false;
+        throw new Error(`Ошибка вставки: ${error.message}`);
       }
     }
     
     return true;
   } catch (err) {
     console.error("[saveReport] unexpected error:", err);
-    return false;
+    throw err;
   }
 }
 

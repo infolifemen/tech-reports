@@ -161,21 +161,28 @@ export default function Home() {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Таймаут: сервер не отвечает более 15 сек')), 15000);
     });
-    const success = await Promise.race([saveReport(report), timeoutPromise]);
-    if (success) {
-      setReports(prev => {
-        const idx = prev.findIndex(r => r.id === report.id);
-        if (idx >= 0) {
-          const updated = [...prev];
-          updated[idx] = report;
-          return updated;
-        }
-        return [report, ...prev];
-      });
-      setShowModal(false);
-      setEditing(null);
-    } else {
-      throw new Error('Сервер вернул ошибку');
+    
+    try {
+      const success = await Promise.race([saveReport(report), timeoutPromise]);
+      
+      if (success) {
+        setReports(prev => {
+          const idx = prev.findIndex(r => r.id === report.id);
+          if (idx >= 0) {
+            const updated = [...prev];
+            updated[idx] = report;
+            return updated;
+          }
+          return [report, ...prev];
+        });
+        setShowModal(false);
+        setEditing(null);
+      } else {
+        throw new Error('Сервер вернул ошибку при сохранении');
+      }
+    } catch (err) {
+      console.error('[handleSave] error:', err);
+      throw err;
     }
   }, []);
 
@@ -224,7 +231,12 @@ export default function Home() {
   useEffect(() => {
     if (!headerRef.current) return;
     const el = headerRef.current;
-    const update = () => setHeaderHeight(el.getBoundingClientRect().height);
+    const update = () => {
+      const height = el.getBoundingClientRect().height;
+      setHeaderHeight(height);
+      // Устанавливаем CSS переменную для sticky header
+      document.documentElement.style.setProperty('--sticky-top', `${height}px`);
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -273,8 +285,8 @@ export default function Home() {
         <AdminPanel onBack={() => { window.location.hash = ''; setShowAdmin(false); }} />
       ) : (
       <div style={{ display: 'flex', flexDirection: 'column', background: '#f0eeeb', minHeight: '100vh' }}>
-        {/* FIXED HEADER + FILTERS wrapper */}
-        <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }}>
+        {/* FIXED HEADER + FILTERS wrapper — z-index 10, ниже таблицы (z-index 20) чтобы строка заголовков таблицы накрывала его */}
+        <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10 }}>
         <header style={{
           display: 'flex',
           alignItems: 'center',
@@ -506,8 +518,8 @@ export default function Home() {
         {/* Spacer высотой с fixed хедер+фильтры — чтобы контент не прятался под ним */}
         <div style={{ height: headerHeight, flexShrink: 0 }} />
 
-        {/* Table */}
-        <div style={{ padding: '16px 24px 40px' }}>
+        {/* Table container — position: relative + z-index: 20, выше fixed header (z-index: 10) */}
+        <div style={{ padding: '16px 24px 40px', position: 'relative', zIndex: 20 }}>
           {!loaded ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>Загрузка...</div>
           ) : filtered.length === 0 ? (
@@ -515,7 +527,7 @@ export default function Home() {
               {reports.length === 0 ? 'Нет данных. Добавьте первый отчёт или импортируйте из Excel.' : showArchived ? '📦 Архив пуст.' : 'Нет записей по выбранным фильтрам.'}
             </div>
           ) : (
-            <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%', '--sticky-top': `${headerHeight}px` } as React.CSSProperties}>
+            <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
               <colgroup>
                 <col style={{ width: '17%' }} />
                 <col style={{ width: '10%' }} />
@@ -574,6 +586,7 @@ export default function Home() {
             onSave={handleSave}
             onDelete={handleDelete}
             onClose={() => { setShowModal(false); setEditing(null); }}
+            allExecutors={uniqueExecutors}
           />
         )}
 
@@ -594,16 +607,49 @@ export default function Home() {
 }
 
 // === EDIT MODAL ===
-function EditModal({ report, isNew, onSave, onDelete, onClose }: {
+function EditModal({ report, isNew, onSave, onDelete, onClose, allExecutors = [] }: {
   report: TechReport;
   isNew: boolean;
   onSave: (r: TechReport) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  allExecutors?: string[];
 }) {
   const [form, setForm] = useState<TechReport>({ ...report });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Executor multi-select state
+  const [selectedExecutors, setSelectedExecutors] = useState<string[]>(
+    (report.executor || '').split(/[,\/\s]+/).map(s => s.trim()).filter(Boolean)
+  );
+  const [executorDropdownOpen, setExecutorDropdownOpen] = useState(false);
+  const executorRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (executorRef.current && !executorRef.current.contains(e.target as Node)) {
+        setExecutorDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleExecutor = (exec: string) => {
+    const newSelected = selectedExecutors.includes(exec)
+      ? selectedExecutors.filter(e => e !== exec)
+      : [...selectedExecutors, exec];
+    setSelectedExecutors(newSelected);
+    setForm(prev => ({ ...prev, executor: newSelected.join(', ') }));
+  };
+
+  const removeExecutor = (exec: string) => {
+    const newSelected = selectedExecutors.filter(e => e !== exec);
+    setSelectedExecutors(newSelected);
+    setForm(prev => ({ ...prev, executor: newSelected.join(', ') }));
+  };
 
   const fields: Array<{ key: keyof TechReport; label: string; type?: string }> = [
     { key: 'object', label: 'Объект' },
@@ -663,7 +709,65 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
           {fields.map(f => (
             <div key={f.key}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#5a5a72', marginBottom: 4 }}>{f.label}</label>
-              {f.key === 'service_type' ? (
+              {f.key === 'executor' ? (
+                <div ref={executorRef} className="executor-multi-select" style={{ position: 'relative' }}>
+                  <div
+                    onClick={() => setExecutorDropdownOpen(!executorDropdownOpen)}
+                    style={{
+                      width: '100%',
+                      minHeight: 42,
+                      padding: '6px 8px',
+                      border: `1px solid ${executorDropdownOpen ? '#2563eb' : '#e5e7eb'}`,
+                      borderRadius: 8,
+                      fontSize: 14,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 4,
+                      alignItems: 'center',
+                      background: 'white',
+                    }}
+                  >
+                    {selectedExecutors.length === 0 ? (
+                      <span style={{ color: '#9ca3af', fontSize: 14 }}>Выберите исполнителей...</span>
+                    ) : (
+                      selectedExecutors.map(exec => (
+                        <span key={exec} className="executor-tag">
+                          {exec}
+                          <span
+                            onClick={(e) => { e.stopPropagation(); removeExecutor(exec); }}
+                            style={{ cursor: 'pointer', marginLeft: 4, fontWeight: 700, color: '#6b7280' }}
+                          >×</span>
+                        </span>
+                      ))
+                    )}
+                    <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: 12 }}>▼</span>
+                  </div>
+                  {executorDropdownOpen && (
+                    <div className="executor-dropdown">
+                      {allExecutors.length === 0 ? (
+                        <div style={{ padding: '12px', color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>Нет доступных исполнителей</div>
+                      ) : (
+                        allExecutors.map(exec => (
+                          <div
+                            key={exec}
+                            className="executor-option"
+                            onClick={() => toggleExecutor(exec)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedExecutors.includes(exec)}
+                              readOnly
+                              style={{ accentColor: '#2563eb' }}
+                            />
+                            <span style={{ fontSize: 13 }}>{exec}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : f.key === 'service_type' ? (
                 <select
                   value={form[f.key]}
                   onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}

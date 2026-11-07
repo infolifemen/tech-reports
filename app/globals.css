@@ -8,10 +8,14 @@
   margin: 0;
 }
 
-html,
+html {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
 body {
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -44,7 +48,8 @@ body {
 
 .report-table th {
   position: sticky;
-  /* top задаётся через CSS переменную --sticky-top из inline style */
+  /* Прилипает к верху viewport, накрывая fixed header (который имеет z-index: 10) */
+  /* Динамически вычисляется через CSS переменную --sticky-top, установленную через JS */
   top: var(--sticky-top, 0px);
   z-index: 50;
   background: #f8f9fb;
