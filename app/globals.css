@@ -48,10 +48,9 @@ body {
 
 .report-table th {
   position: sticky;
-  /* Прилипает к верху viewport, накрывая fixed header (который имеет z-index: 10) */
-  /* Динамически вычисляется через CSS переменную --sticky-top, установленную через JS */
-  top: var(--sticky-top, 0px);
-  z-index: 50;
+  /* Прилипает к ВЕРХУ viewport (top: 0), полностью ЗАКРЫВАЯ fixed header */
+  top: 0;
+  z-index: 100;
   background: #f8f9fb;
   padding: 6px 8px;
   text-align: left;

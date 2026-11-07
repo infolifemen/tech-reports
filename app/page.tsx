@@ -619,34 +619,15 @@ function EditModal({ report, isNew, onSave, onDelete, onClose, allExecutors = []
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Executor multi-select state
+  // Executor multi-select state (клик по тегам, как в График командировок)
   const [selectedExecutors, setSelectedExecutors] = useState<string[]>(
     (report.executor || '').split(/[,\/\s]+/).map(s => s.trim()).filter(Boolean)
   );
-  const [executorDropdownOpen, setExecutorDropdownOpen] = useState(false);
-  const executorRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (executorRef.current && !executorRef.current.contains(e.target as Node)) {
-        setExecutorDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const toggleExecutor = (exec: string) => {
     const newSelected = selectedExecutors.includes(exec)
       ? selectedExecutors.filter(e => e !== exec)
       : [...selectedExecutors, exec];
-    setSelectedExecutors(newSelected);
-    setForm(prev => ({ ...prev, executor: newSelected.join(', ') }));
-  };
-
-  const removeExecutor = (exec: string) => {
-    const newSelected = selectedExecutors.filter(e => e !== exec);
     setSelectedExecutors(newSelected);
     setForm(prev => ({ ...prev, executor: newSelected.join(', ') }));
   };
@@ -710,60 +691,43 @@ function EditModal({ report, isNew, onSave, onDelete, onClose, allExecutors = []
             <div key={f.key}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#5a5a72', marginBottom: 4 }}>{f.label}</label>
               {f.key === 'executor' ? (
-                <div ref={executorRef} className="executor-multi-select" style={{ position: 'relative' }}>
-                  <div
-                    onClick={() => setExecutorDropdownOpen(!executorDropdownOpen)}
-                    style={{
-                      width: '100%',
-                      minHeight: 42,
-                      padding: '6px 8px',
-                      border: `1px solid ${executorDropdownOpen ? '#2563eb' : '#e5e7eb'}`,
-                      borderRadius: 8,
-                      fontSize: 14,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 4,
-                      alignItems: 'center',
-                      background: 'white',
-                    }}
-                  >
-                    {selectedExecutors.length === 0 ? (
-                      <span style={{ color: '#9ca3af', fontSize: 14 }}>Выберите исполнителей...</span>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {allExecutors.length === 0 ? (
+                      <span style={{ color: '#9ca3af', fontSize: 13 }}>Нет доступных исполнителей</span>
                     ) : (
-                      selectedExecutors.map(exec => (
-                        <span key={exec} className="executor-tag">
-                          {exec}
-                          <span
-                            onClick={(e) => { e.stopPropagation(); removeExecutor(exec); }}
-                            style={{ cursor: 'pointer', marginLeft: 4, fontWeight: 700, color: '#6b7280' }}
-                          >×</span>
-                        </span>
-                      ))
-                    )}
-                    <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: 12 }}>▼</span>
-                  </div>
-                  {executorDropdownOpen && (
-                    <div className="executor-dropdown">
-                      {allExecutors.length === 0 ? (
-                        <div style={{ padding: '12px', color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>Нет доступных исполнителей</div>
-                      ) : (
-                        allExecutors.map(exec => (
-                          <div
+                      allExecutors.map(exec => {
+                        const isSelected = selectedExecutors.includes(exec);
+                        return (
+                          <button
                             key={exec}
-                            className="executor-option"
+                            type="button"
                             onClick={() => toggleExecutor(exec)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '6px 14px',
+                              borderRadius: 20,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                              background: isSelected ? 'rgba(37,99,235,0.1)' : 'transparent',
+                              color: isSelected ? '#2563eb' : '#5a5a72',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              fontFamily: 'inherit',
+                            }}
                           >
-                            <input
-                              type="checkbox"
-                              checked={selectedExecutors.includes(exec)}
-                              readOnly
-                              style={{ accentColor: '#2563eb' }}
-                            />
-                            <span style={{ fontSize: 13 }}>{exec}</span>
-                          </div>
-                        ))
-                      )}
+                            {exec}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                  {selectedExecutors.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#5a5a72' }}>
+                      Выбрано: {selectedExecutors.join(', ')}
                     </div>
                   )}
                 </div>
