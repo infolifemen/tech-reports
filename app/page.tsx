@@ -480,15 +480,15 @@ export default function Home() {
           ) : (
             <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
               <colgroup>
-                <col style={{ width: '18%' }} />
+                <col style={{ width: '17%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '9%' }} />
                 <col style={{ width: '11%' }} />
                 <col style={{ width: '6%' }} />
                 <col style={{ width: '10%' }} />
-                <col style={{ width: '11%' }} />
-                <col style={{ width: '15%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '18%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -499,8 +499,8 @@ export default function Home() {
                   <th>Исполнители</th>
                   <th>№ отчёта</th>
                   <th>Статус отчёта</th>
-                  <th>Оригинал отчёта</th>
-                  <th>Примечание</th>
+                  <th>Вид отчёта</th>
+                  <th>Комментарий</th>
                 </tr>
               </thead>
               <tbody>
@@ -576,7 +576,7 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
     { key: 'executor', label: 'Исполнители' },
     { key: 'report_number', label: '№ отчёта' },
     { key: 'report_status', label: 'Статус отчёта' },
-    { key: 'direction', label: 'Оригинал отчёта' },
+    { key: 'direction', label: 'Вид отчёта' },
   ];
 
   // Dropdown options for status fields
@@ -651,7 +651,7 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
             </div>
           ))}
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#5a5a72', marginBottom: 4 }}>Примечание</label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#5a5a72', marginBottom: 4 }}>Комментарий</label>
             <textarea
               value={form.notes}
               onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
