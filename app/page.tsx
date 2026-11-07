@@ -240,7 +240,7 @@ export default function Home() {
       {showAdmin ? (
         <AdminPanel onBack={() => { window.location.hash = ''; setShowAdmin(false); }} />
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f0eeeb', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f0eeeb' }}>
         {/* Header */}
         <header style={{
           position: 'relative',
@@ -470,7 +470,7 @@ export default function Home() {
         </div>
 
         {/* Table */}
-        <div style={{ flex: 1, padding: '16px 24px', overflow: 'auto', minHeight: 0 }}>
+        <div style={{ padding: '16px 24px 40px' }}>
           {!loaded ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#5a5a72' }}>Загрузка...</div>
           ) : filtered.length === 0 ? (
@@ -480,15 +480,15 @@ export default function Home() {
           ) : (
             <table className="report-table" style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', width: '100%' }}>
               <colgroup>
-                <col style={{ width: '19%' }} />
+                <col style={{ width: '18%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '9%' }} />
                 <col style={{ width: '11%' }} />
                 <col style={{ width: '6%' }} />
                 <col style={{ width: '10%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '13%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '15%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -498,8 +498,8 @@ export default function Home() {
                   <th>Даты работ</th>
                   <th>Исполнители</th>
                   <th>№ отчёта</th>
-                  <th>Статус</th>
-                  <th>Направление</th>
+                  <th>Статус отчёта</th>
+                  <th>Оригинал отчёта</th>
                   <th>Примечание</th>
                 </tr>
               </thead>
@@ -576,8 +576,16 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
     { key: 'executor', label: 'Исполнители' },
     { key: 'report_number', label: '№ отчёта' },
     { key: 'report_status', label: 'Статус отчёта' },
-    { key: 'direction', label: 'Направление' },
+    { key: 'direction', label: 'Оригинал отчёта' },
   ];
+
+  // Dropdown options for status fields
+  const statusOptions: Record<string, string[]> = {
+    rp_status: ['РП', 'Процедура', 'Не требуется', 'у Заказчика', 'Согласовано'],
+    letters_status: ['Не требуется', 'Согласовано', 'у Заказчика', 'Требуется'],
+    report_status: ['Требуется', 'у Заказчика', 'Согласовано'],
+    direction: ['.pdf', 'Печат верс', 'Распечатать'],
+  };
 
   return (
     <div
@@ -622,6 +630,15 @@ function EditModal({ report, isNew, onSave, onDelete, onClose }: {
                 >
                   <option value="">—</option>
                   {SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : statusOptions[f.key] ? (
+                <select
+                  value={form[f.key]}
+                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                >
+                  <option value="">—</option>
+                  {statusOptions[f.key].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               ) : (
                 <input
